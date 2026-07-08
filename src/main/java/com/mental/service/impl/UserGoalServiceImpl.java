@@ -37,41 +37,49 @@ public class UserGoalServiceImpl implements UserGoalService {
         return goalRepository.save(goal);
     }
 
-    @Override
     @Transactional
     public UserGoal updateProgress(Long id) {
-        UserGoal goal = goalRepository.findById(id).orElseThrow();
-        UserStreak streak = streakRepository.findByUser(goal.getUser());
+        UserGoal goal = goalRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Goal not found"));
+
+        // Retrieve or initialize the user's streak
+        UserStreak streak = streakRepository.findByUser(goal.getUser())
+                .orElseGet(() -> {
+                    UserStreak newStreak = new UserStreak();
+                    newStreak.setUser(goal.getUser());
+                    newStreak.setStreakCount(0);
+                    return streakRepository.save(newStreak);
+                });
+
         LocalDate today = LocalDate.now();
 
-        // 1. Progress တိုးခြင်း (ဒီနေ့အတွက် တစ်ကြိမ်သာ တိုးခွင့်ပေးခြင်း)
+        // 1. Progress and Streak Logic
+        // Only allow progress update once per day
         if (streak.getLastCompleted() == null || !streak.getLastCompleted().isEqual(today)) {
 
-            // Progress Update
+            // Increment progress
             if (goal.getProgress() < goal.getTargetDays()) {
                 goal.setProgress(goal.getProgress() + 1);
             }
 
-            // 2. Streak Logic
+            // Streak calculation logic
             if (streak.getLastCompleted() != null && streak.getLastCompleted().isEqual(today.minusDays(1))) {
-                streak.setStreakCount(streak.getStreakCount() + 1); // ရက်ဆက်ရင် +1
+                streak.setStreakCount(streak.getStreakCount() + 1);
             } else if (streak.getLastCompleted() == null || streak.getLastCompleted().isBefore(today.minusDays(1))) {
-                streak.setStreakCount(1); // အဆက်ပြတ်သွားရင် 1 ပြန်စ
+                streak.setStreakCount(1);
             }
 
-            // Update streak and completion status
             streak.setLastCompleted(today);
             streakRepository.save(streak);
         }
 
-        // 3. Goal Completion Status
+        // 2. Goal Completion Status
         if (goal.getProgress() >= goal.getTargetDays()) {
             goal.setStatus(GoalStatus.COMPLETED);
         }
 
         return goalRepository.save(goal);
     }
-
     @Override
     public List<UserGoal> getUserGoals(String username) {
         return goalRepository.findByUserUsername(username);

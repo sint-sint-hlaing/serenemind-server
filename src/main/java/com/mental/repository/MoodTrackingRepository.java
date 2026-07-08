@@ -21,4 +21,5 @@ public interface MoodTrackingRepository extends JpaRepository<MoodEntry,Long> {
     @Query("SELECT m.mood, COUNT(m) FROM MoodEntry m GROUP BY m.mood")
     List<Object[]> getMoodDistribution();
 
+    List<MoodEntry> findByUserUsername(String username);
 }

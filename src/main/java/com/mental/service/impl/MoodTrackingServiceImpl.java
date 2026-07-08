@@ -1,5 +1,6 @@
 package com.mental.service.impl;
 
+import com.mental.dto.mood.MoodRequest;
 import com.mental.mapper.MoodMapper;
 import com.mental.dto.mood.MoodEntryDto;
 import com.mental.model.entity.MoodAnalysis;
@@ -16,7 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.security.Principal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,6 +30,7 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
         private final MoodTrackingRepository moodTrackingRepository;
         private final MoodMapper moodMapper;
         private final UserRepository userRepository;
+        /*
         @Override
         @Transactional
         public MoodEntryDto saveMood(MoodEntryDto mood, UserPrincipal principal) {
@@ -49,13 +53,9 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
 
             MoodEntry savedEntry = moodTrackingRepository.save(entry);
             return moodMapper.toDto(savedEntry);
-        }
+        }**/
 
-        @Override
-        public List<MoodEntryDto> findAllMoods(String name) {
-            return moodTrackingRepository.findByUserEmailOrderByCreatedAtDesc(name)
-                    .stream().map(moodMapper::toDto).collect(Collectors.toList());
-        }
+
 
 
     @Override
@@ -81,4 +81,39 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
         }
         moodTrackingRepository.delete(mood);
     }
+
+    @Override
+    public void saveMood(String username, MoodRequest request) {
+        // 1. Fetch the user who is currently logged in
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // 2. Map DTO to Entity
+        MoodEntry entry = new MoodEntry();
+        entry.setUser(user);
+        entry.setMood(request.mood()); // Enum mapping
+        entry.setIntensity(request.intensity());
+        entry.setNote(request.note());
+        entry.setCreatedAt(Instant.now());
+
+        // 3. Save to database
+        moodTrackingRepository.save(entry);
+
+    }
+
+    @Override
+    public Map<String, Double> getMoodSummary(String username) {
+        List<MoodEntry> moods = moodTrackingRepository.findByUserUsername(username);
+        if (moods.isEmpty()) return Collections.emptyMap();
+
+        long total = moods.size();
+
+        return moods.stream()
+                .collect(Collectors.groupingBy(
+                        m -> m.getMood().name(), // Group by MoodType name (e.g., "HAPPY")
+                        Collectors.collectingAndThen(
+                                Collectors.counting(),
+                                count -> (double) count / total * 100 // Calculate percentage
+                        )
+                ));    }
 }
