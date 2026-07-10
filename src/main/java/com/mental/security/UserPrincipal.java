@@ -49,5 +49,9 @@ public class UserPrincipal
     return user.getEmail();
     }
 
+    public Long getId(){
+        return user.getId();
+    }
+
 
 }
