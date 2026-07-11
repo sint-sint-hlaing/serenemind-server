@@ -9,6 +9,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -34,6 +35,12 @@ public class User extends BaseEntity {
     private UserProfile profile;
 
     private boolean isActive;
+
+    // 👈 Streak ဆိုင်ရာ Field များ
+    private int currentStreak = 0;
+    private int longestStreak = 0;
+    private int streakFreezeCount = 1; // စဖွင့်ချင်း Free Item တစ်ခုပေးထားမည်
+    private LocalDate lastActiveDate;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<MoodEntry> moods;

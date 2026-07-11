@@ -28,6 +28,7 @@ public class PostService {
     private final PostLikeRepository postLikeRepository;
     private final UserRepository userRepository;
     private final CloudinaryService cloudinaryService;
+    private final StreakService streakService;
 
     // UI - Community Feed (Recent သို့မဟုတ် Popular အလိုက် ဆွဲထုတ်ခြင်း)
     @Transactional(readOnly = true)
@@ -73,6 +74,7 @@ public class PostService {
         post.setCommentCount(0);
 
         Post savedPost = postRepository.save(post);
+        streakService.updateStreak(userPrincipal.getEmail());
         return convertToPostResponse(savedPost, user);
     }
     // UI - Post တစ်ခုကို Like ပေးခြင်း / ပြန်ဖြုတ်ခြင်း (Toggle)

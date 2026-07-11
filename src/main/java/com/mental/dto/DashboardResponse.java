@@ -7,8 +7,9 @@ public record DashboardResponse(
         String currentMood,
         int moodPercentage,
         List<WeeklyData> weeklyDataList,
-        List<ActionItem> quickActions
-
+        List<ActionItem> quickActions,
+        int currentStreak,
+        boolean isNewBest
 
 ) {
 }

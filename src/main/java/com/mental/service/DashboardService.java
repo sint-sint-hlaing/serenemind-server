@@ -33,12 +33,17 @@ public class DashboardService {
                 ))
                 .collect(Collectors.toList());
 
+        // 👈 စံချိန်ဟောင်းထက် ကျော်မကျော် တွက်ချက်ခြင်း (0 ထက်ကြီးမှ စစ်ရန်)
+        boolean isNewBest = user.getCurrentStreak() > 0 && user.getCurrentStreak() >= user.getLongestStreak();
+
         return new DashboardResponse(
                 user.getUsername(),
                 latestMood != null ? latestMood.getMood().name() : "None",
                 latestMood != null ? latestMood.getIntensity() * 10 : 0,
                 weeklyDataList,
-                List.of(new ActionItem("Journal", "icon_url"), new ActionItem("Meditate", "icon_url"))
+                List.of(new ActionItem("Journal", "icon_url"), new ActionItem("Meditate", "icon_url")),
+                user.getCurrentStreak(), // 👈 ထည့်သွင်းရန်
+                isNewBest                // 👈 ထည့်သွင်းရန်
         );
     }
 }

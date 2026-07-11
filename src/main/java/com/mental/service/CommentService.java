@@ -27,6 +27,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final StreakService streakService;
 
     // UI - သက်ဆိုင်ရာ Post ID အလိုက် ကွန်မန့်များအားလုံး ဆွဲထုတ်ခြင်း
     @Transactional(readOnly = true)
@@ -78,6 +79,8 @@ public class CommentService {
         // ပို့စ်၏ Comment ရေတွက်မှုကို တိုးပေးခြင်း
         post.setCommentCount(post.getCommentCount() + 1);
         postRepository.save(post);
+
+        streakService.updateStreak(userPrincipal.getEmail());
 
         // အသစ်မန့်လိုက်တဲ့အချိန်မှာ သီးခြားခေါ်တာမို့ Map အလွတ်တစ်ခု ပေးလိုက်ပါတယ်
         return convertToCommentResponse(savedComment, new HashMap<>(), user);
