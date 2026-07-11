@@ -62,20 +62,19 @@ public class PostService {
         User user = userRepository.findByEmail(userPrincipal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        // Cloudinary သို့ ပုံတင်ပြီး URL ယူခြင်း (ပုံမပါလျှင် null ဖြစ်မည်)
         String imageUrl = cloudinaryService.uploadImage(imageFile);
 
         Post post = new Post();
         post.setContent(request.getContent());
         post.setImageUrl(imageUrl);
         post.setUser(user);
+        post.setAnonymous(request.isAnonymous()); // 👈 ဒီလိုင်းအသစ်ကို ထည့်ပေးပါ
         post.setLikeCount(0);
         post.setCommentCount(0);
 
         Post savedPost = postRepository.save(post);
         return convertToPostResponse(savedPost, user);
     }
-
     // UI - Post တစ်ခုကို Like ပေးခြင်း / ပြန်ဖြုတ်ခြင်း (Toggle)
     @Transactional
     public void toggleLikePost(Long id, UserPrincipal userPrincipal) {
@@ -106,21 +105,34 @@ public class PostService {
     private PostResponse convertToPostResponse(Post post, User currentUser) {
         boolean isLiked = postLikeRepository.existsByPostIdAndUserId(post.getId(), currentUser.getId());
 
-        // User Profile Picture ရှိမရှိ စစ်ဆေးခြင်း (မရှိလျှင် null)
-        String profilePic = (post.getUser().getUserProfile() != null)
-                ? post.getUser().getUserProfile().getAvatar()
-                : null;
-
         PostResponse response = new PostResponse();
         response.setId(post.getId());
         response.setContent(post.getContent());
         response.setImageUrl(post.getImageUrl());
-        response.setUsername(post.getUser().getUsername());
-        response.setUserProfilePicture(profilePic);
         response.setLikeCount(post.getLikeCount());
         response.setCommentCount(post.getCommentCount());
         response.setLikedByMe(isLiked);
         response.setCreatedAt(post.getCreatedAt());
+        response.setAnonymous(post.isAnonymous()); // DTO မှာ anonymous boolean ပြန်ပေးရန်
+
+        // 👈 Anonymous ဟုတ်မဟုတ် စစ်ဆေးပြီး ဒေတာခွဲထုတ်မည့်အပိုင်း
+        if (post.isAnonymous()) {
+
+            // 👈 လက်ရှိကြည့်နေသူ (currentUser ID) နှင့် ပို့စ်ပိုင်ရှင် (post.getUser() ID) တူမတူ စစ်ဆေးခြင်း
+            if (post.getUser().getId().equals(currentUser.getId())) {
+                response.setUsername("Anonymous (You)");
+            } else {
+                response.setUsername("Anonymous");
+            }
+
+            response.setUserProfilePicture(null);
+        } else {
+            String profilePic = (post.getUser().getUserProfile() != null)
+                    ? post.getUser().getUserProfile().getAvatar()
+                    : null;
+            response.setUsername(post.getUser().getUsername());
+            response.setUserProfilePicture(profilePic);
+        }
 
         return response;
     }
