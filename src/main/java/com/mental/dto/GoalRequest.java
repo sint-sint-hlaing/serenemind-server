@@ -1,14 +1,16 @@
 package com.mental.dto;
 
-
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 
-/**
- * DTO for creating or updating a User Goal.
- */
 @Builder
 public record GoalRequest(
+        @NotBlank(message = "Title is required")
         String title,
+
         String description,
+
+        @Min(value = 1, message = "Target days must be at least 1")
         int targetDays
 ) {}

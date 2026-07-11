@@ -19,6 +19,8 @@ public class MeditationResponse {
 
     private String audioUrl;
 
+    private String imgUrl;
+
     private String description;
 
 }

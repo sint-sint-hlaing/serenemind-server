@@ -22,8 +22,10 @@ public class UserGoal extends BaseEntity {
 
 
     private int targetDays;
-    private int progress;
+
+
+    private int progress = 0;
 
     @Enumerated(EnumType.STRING)
-    private GoalStatus status;
+    private GoalStatus status = GoalStatus.ACTIVE;
 }

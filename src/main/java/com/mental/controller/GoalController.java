@@ -16,8 +16,8 @@ public class GoalController {
     private final UserGoalService goalService;
 
     @PostMapping
-    public ResponseEntity<UserGoal> createGoal(String username,@RequestBody GoalRequest request) {
-        return ResponseEntity.ok(goalService.createGoal(username, request));
+    public ResponseEntity<UserGoal> createGoal(String email,@RequestBody GoalRequest request) {
+        return ResponseEntity.ok(goalService.createGoal(email, request));
     }
 
     @GetMapping

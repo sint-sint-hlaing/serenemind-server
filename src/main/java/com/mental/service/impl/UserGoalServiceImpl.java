@@ -1,6 +1,7 @@
 package com.mental.service.impl;
 
 import com.mental.dto.GoalRequest;
+import com.mental.exception.UserNotFoundException;
 import com.mental.model.entity.*;
 import com.mental.model.entity.enums.GoalStatus;
 import com.mental.repository.UserGoalRepository;
@@ -8,12 +9,16 @@ import com.mental.repository.UserStreakRepository;
 import com.mental.repository.UserRepository;
 import com.mental.service.UserGoalService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
 
+import static java.rmi.server.LogStream.log;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserGoalServiceImpl implements UserGoalService {
@@ -23,9 +28,9 @@ public class UserGoalServiceImpl implements UserGoalService {
 
     @Override
     @Transactional
-    public UserGoal createGoal(String username, GoalRequest request) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public UserGoal createGoal(String email, GoalRequest request) {
+        User user = userRepository.findByEmail( email)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
 
         UserGoal goal = new UserGoal();
         goal.setUser(user);

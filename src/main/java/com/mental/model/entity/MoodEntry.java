@@ -2,6 +2,7 @@ package com.mental.model.entity;
 
 import com.mental.model.entity.enums.MoodType;
 import jakarta.persistence.*;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
