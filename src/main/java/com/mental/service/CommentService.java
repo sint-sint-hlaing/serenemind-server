@@ -28,6 +28,7 @@ public class CommentService {
     private final PostRepository postRepository;
     private final UserRepository userRepository;
     private final StreakService streakService;
+    private final NotificationService notificationService;
 
     // UI - သက်ဆိုင်ရာ Post ID အလိုက် ကွန်မန့်များအားလုံး ဆွဲထုတ်ခြင်း
     @Transactional(readOnly = true)
@@ -39,7 +40,7 @@ public class CommentService {
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        List<Comment> comments = commentRepository.findByPostIdOrderByCreatedAtAsc(postId);
+        List<Comment> comments = commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
 
         // ပို့စ်တစ်ခုတည်းအောက်က Anonymous User တစ်ယောက်စီကို နံပါတ်စဉ် သတ်မှတ်ရန် Map ဆောက်ခြင်း
         Map<Long, Integer> anonymousUserMap = new HashMap<>();
@@ -79,6 +80,22 @@ public class CommentService {
         // ပို့စ်၏ Comment ရေတွက်မှုကို တိုးပေးခြင်း
         post.setCommentCount(post.getCommentCount() + 1);
         postRepository.save(post);
+
+        // 👈 ကွန်မန့်အသစ်တင်လိုက်လျှင် ပို့စ်ပိုင်ရှင်ထံ Notification သွားသိမ်းပေးမည့်အပိုင်း
+        if (!post.getUser().getId().equals(user.getId())) { // မိမိပို့စ်ကို မိမိပြန်မန့်လျှင် Noti မတက်စေရန်
+
+            // ကွန်မန့်ရှင်က Anonymous ဖြစ်နေရင် Noti မှာ "Anonymous" လို့ပြပြီး ပုံမှန်ဆိုရင် ၎င်း၏ Username ပြရန်
+            String commenterName = comment.isAnonymous() ? "Anonymous" : user.getUsername();
+
+            notificationService.createNotification(
+                    post.getUser(), // Noti လက်ခံမည့် ပို့စ်ပိုင်ရှင်
+                    "New comment on your post", // Title
+                    commenterName + " commented: \"" + comment.getContent() + "\"", // Message
+                    "COMMENT", // Type (Icon ပြောင်းရန်)
+                    post.getId(), // Target ID (Post Detail သို့ သွားရန်)
+                    "COMMENT" // Target Type
+            );
+        }
 
         streakService.updateStreak(userPrincipal.getEmail());
 

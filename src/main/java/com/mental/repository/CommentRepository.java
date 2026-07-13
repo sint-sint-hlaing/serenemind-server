@@ -9,4 +9,5 @@ import java.util.List;
 public interface CommentRepository extends JpaRepository<Comment, Long> {
     // သက်ဆိုင်ရာ Post ID အလိုက် ကွန်မန့်များအားလုံးကို အစဉ်လိုက်ဆွဲထုတ်ရန်
     List<com.mental.model.entity.Comment> findByPostIdOrderByCreatedAtAsc(Long postId);
+    List<Comment> findByPostIdOrderByCreatedAtDesc(Long postId);
 }
