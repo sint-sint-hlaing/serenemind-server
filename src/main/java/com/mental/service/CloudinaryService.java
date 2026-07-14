@@ -54,4 +54,45 @@ public class CloudinaryService {
             throw new RuntimeException("Cloudinary သို့ ပုံတင်ခြင်း မအောင်မြင်ပါ- ", e);
         }
     }
+
+
+    /**
+     * Delete an image from Cloudinary using its secure URL.
+     */
+    public void deleteImage(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            return;
+        }
+        try {
+            String publicId = extractPublicId(imageUrl);
+            if (publicId != null) {
+                cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+            }
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to delete image from Cloudinary", e);
+        }
+    }
+
+    private String extractPublicId(String url) {
+        try {
+            int uploadIndex = url.indexOf("/upload/");
+            if (uploadIndex == -1) return null;
+
+            String sub = url.substring(uploadIndex + 8); // strip up to "/upload/"
+
+            // If it starts with a version path (e.g. v1571218039/), skip it
+            if (sub.startsWith("v") && sub.indexOf('/') != -1 && sub.substring(1, sub.indexOf('/')).matches("\\d+")) {
+                sub = sub.substring(sub.indexOf('/') + 1);
+            }
+
+            // Strip file extension
+            int dotIndex = sub.lastIndexOf('.');
+            if (dotIndex != -1) {
+                sub = sub.substring(0, dotIndex);
+            }
+            return sub;
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }
