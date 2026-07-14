@@ -7,4 +7,5 @@ import lombok.*;
 public class CommentRequest {
     @NotBlank(message = "Comment cannot be empty")
     private String content;
+    private boolean isAnonymous;
 }

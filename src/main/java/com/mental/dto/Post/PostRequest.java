@@ -10,4 +10,5 @@ public class PostRequest {
     @NotBlank(message = "Content cannot be empty")
     private String content;
     private String imageUrl;
+    private boolean isAnonymous;
 }

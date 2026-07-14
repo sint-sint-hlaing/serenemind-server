@@ -15,6 +15,9 @@ public class Comment {
     @Column(nullable = false, length = 500)
     private String content;
 
+    @Column(nullable = false)
+    private boolean isAnonymous = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "post_id", nullable = false)
     private Post post;

@@ -14,10 +14,11 @@ public class PostResponse {
     private Long id;
     private String content;
     private String imageUrl;
-    private String username;
-    private String userProfilePicture;
+    private boolean isAnonymous;
     private int likeCount;
     private int commentCount;
-    private boolean isLikedByMe;
     private LocalDateTime createdAt;
+    private String username;
+    private String userProfilePicture;
+    private boolean isLikedByMe;
 }

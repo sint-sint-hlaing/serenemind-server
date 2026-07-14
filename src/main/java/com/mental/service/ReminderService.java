@@ -4,7 +4,9 @@ import com.mental.dto.Reminder.ReminderRequest;
 import com.mental.dto.Reminder.ReminderResponse;
 import com.mental.exception.ResourceNotFoundException; // Replace with your custom exception
 import com.mental.model.entity.Reminder;
+import com.mental.model.entity.User;
 import com.mental.repository.ReminderRepository;
+import com.mental.repository.UserRepository;
 import com.mental.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,32 @@ import java.util.stream.Collectors;
 public class ReminderService {
 
     private final ReminderRepository reminderRepository;
+    private final NotificationService notificationService;
+    private final UserRepository userRepository;
+
+    // 👈 Schedulers သို့မဟုတ် Background Task တစ်ခုခုကနေ Reminder Missed ဖြစ်ကြောင်း လှမ်းခေါ်မည့် Method
+    @Transactional
+    public void triggerReminderMissed(Long reminderId) {
+        Reminder reminder = reminderRepository.findById(reminderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reminder not found with id: " + reminderId));
+
+        User user = userRepository.findById(reminder.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + reminder.getUserId()));
+
+        // Noti ထဲတွင် ပြသမည့် စာသားပုံစံ ပြင်ဆင်ခြင်း
+        String title = "Reminder missed";
+        String message = "You missed your reminder \"" + reminder.getTitle() + "\" at " + reminder.getReminderTime();
+
+        // NotificationService Helper Method ကို ခေါ်ယူခြင်း
+        notificationService.createNotification(
+                user,               // Noti လက်ခံမည့် အသုံးပြုသူ
+                title,              // Title
+                message,            // Message
+                "REMINDER",         // Noti Icon ပြောင်းရန်အတွက် Type
+                reminder.getId(),   // 👈 Target ID: Reminder ID ကို ပေးရပါမည်
+                "REMINDER"          // 👈 Target Type: Frontend က Reminder Screen ကို သွားရန်
+        );
+    }
 
     @Transactional(readOnly = true)
     public List<ReminderResponse> getRemindersByUserId(UserPrincipal userPrincipal) {

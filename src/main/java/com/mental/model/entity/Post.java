@@ -18,6 +18,9 @@ public class Post {
 
     private String imageUrl; // UI ပုံစံအရ ပုံပါရင်ပြဖို့ (Nullable)
 
+    @Column(nullable = false)
+    private boolean isAnonymous = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;

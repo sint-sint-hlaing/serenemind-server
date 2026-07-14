@@ -21,11 +21,21 @@ public class Notification extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     private User user;
 
-    @Enumerated(EnumType.STRING)
-    private NotificationType type; // LOCAL, FCM
+    @Column(nullable = false)
+    private String title; // e.g., "New like on your journal", "Reminder missed"
 
+    @Column(nullable = false, length = 500)
+    private String message; // e.g., "Aye Thinzar liked your journal..."
 
-    private String title;
-    private String message;
-    private boolean isRead;
+    @Column(nullable = false)
+    private String type; // LIKE, COMMENT, REMINDER, SYSTEM, GOAL, STREAK, INSPIRATION
+
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
+
+    @Column(name = "target_id")
+    private Long targetId; // Post ID သို့မဟုတ် Reminder ID သိမ်းရန်
+
+    @Column(name = "target_type")
+    private String targetType;
 }
