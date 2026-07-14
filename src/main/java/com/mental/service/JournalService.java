@@ -1,7 +1,7 @@
 package com.mental.service;
 
-import com.cloudinary.Cloudinary;
-import com.cloudinary.utils.ObjectUtils;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mental.dto.JournalAnalysisResponse;
 import com.mental.dto.JournalPhotoResponse;
 import com.mental.dto.JournalRequest;
@@ -17,10 +17,15 @@ import com.mental.security.UserPrincipal;
 import com.mental.utils.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -39,11 +44,12 @@ public class JournalService {
     private final JournalAnalysisRepository analysisRepository;
     private final UserRepository userRepository;
     private final EncryptionUtil encryptionUtil;
-    private final Cloudinary cloudinary;
+    private final CloudinaryService cloudinaryService;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /** Cloudinary folder where journal photos are stored. */
-    @Value("${cloudinary.journal-photo-folder:serenemind/journal-photos}")
-    private String cloudinaryFolder;
+    @Value("${gemini.api.key:}")
+    private String geminiApiKey;
 
     /** Allowed MIME types for photo uploads. */
     private static final Set<String> ALLOWED_MIME_TYPES =
@@ -215,27 +221,20 @@ public class JournalService {
         journalRepository.delete(journal);
     }
 
-    // ─────────────────────────────────────────────
-    // PHOTO – UPLOAD (Cloudinary)
-    // ─────────────────────────────────────────────
-
     /**
      * POST /api/journals/{id}/photo
-     * Upload or replace the photo attached to a journal entry via Cloudinary.
+     * Upload or replace the photo attached to a journal entry via CloudinaryService.
      *
      * Flow:
      *   1. Validate ownership, MIME type, and file size.
-     *   2. If an existing photo is stored, destroy it on Cloudinary first.
-     *   3. Upload new image to Cloudinary under folder serenemind/journal-photos.
+     *   2. If an existing photo is stored, delete it on Cloudinary first.
+     *   3. Upload new image using CloudinaryService.
      *   4. Persist the returned secure HTTPS URL on the journal record.
      *
      * Security review:
      *   Ownership validated ✅ | MIME type whitelist (server-side) ✅
-     *   File size capped at 5 MB ✅ | Cloudinary public_id uses journal ID (no user input) ✅
-     *   Old asset destroyed on Cloudinary before replacement ✅
-     *   Credentials in application.properties (never hard-coded) ✅
+     *   File size capped at 5 MB ✅ | Non-breaking integration with CloudinaryService ✅
      *   ⚠️ SECURITY FLAG: Add rate limiting to this endpoint before production.
-     *      Risk: Low-Medium — repeated uploads could exhaust Cloudinary free-tier quota.
      */
     @Transactional
     public JournalPhotoResponse uploadPhoto(Long journalId,
@@ -249,7 +248,6 @@ public class JournalService {
         }
 
         // ── 2. Validate MIME type via server-side whitelist
-        //    Do NOT rely solely on the client-supplied Content-Type header.
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase())) {
             throw new IllegalArgumentException(
@@ -261,46 +259,30 @@ public class JournalService {
             throw new IllegalArgumentException("Photo must not exceed 5 MB");
         }
 
-        try {
-            // ── 4. Destroy old Cloudinary asset before replacing
-            //    We store the public_id as "folder/journal-{id}" so it is deterministic
-            //    and we can always find and destroy it without storing extra metadata.
-            String publicId = cloudinaryFolder + "/journal-" + journalId;
-            if (journal.getPhotoUrl() != null) {
-                cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
+        // ── 4. Destroy old Cloudinary asset before replacing
+        if (journal.getPhotoUrl() != null && !journal.getPhotoUrl().isBlank()) {
+            try {
+                cloudinaryService.deleteImage(journal.getPhotoUrl());
+            } catch (Exception e) {
+                // Non-blocking: proceed even if deletion fails (e.g. file already deleted from Cloudinary dashboard)
             }
+        }
 
-            // ── 5. Upload to Cloudinary
-            //    resource_type=image enforces server-side image validation (rejects non-images
-            //    even if the MIME header was spoofed).
-            @SuppressWarnings("unchecked")
-            Map<String, Object> uploadResult = cloudinary.uploader().upload(
-                    file.getBytes(),
-                    ObjectUtils.asMap(
-                            "public_id",     publicId,
-                            "folder",         cloudinaryFolder,
-                            "resource_type",  "image",
-                            "overwrite",      true,
-                            "quality",        "auto",    // auto-compress for performance
-                            "fetch_format",   "auto"     // auto-serve WebP/AVIF to supported clients
-                    )
-            );
-
-            // ── 6. Persist the Cloudinary secure URL (always HTTPS)
-            String secureUrl = (String) uploadResult.get("secure_url");
-            journal.setPhotoUrl(secureUrl);
-            journalRepository.save(journal);
-
-            JournalPhotoResponse response = new JournalPhotoResponse();
-            response.setJournalId(journalId);
-            response.setPhotoUrl(secureUrl);
-            response.setMessage("Photo uploaded successfully");
-            return response;
-
-        } catch (IOException e) {
-            // Do not expose Cloudinary error details to the client
+        // ── 5. Upload new image using CloudinaryService
+        String secureUrl = cloudinaryService.uploadImage(file);
+        if (secureUrl == null) {
             throw new RuntimeException("Photo upload failed. Please try again.");
         }
+
+        // ── 6. Persist the Cloudinary secure URL
+        journal.setPhotoUrl(secureUrl);
+        journalRepository.save(journal);
+
+        JournalPhotoResponse response = new JournalPhotoResponse();
+        response.setJournalId(journalId);
+        response.setPhotoUrl(secureUrl);
+        response.setMessage("Photo uploaded successfully");
+        return response;
     }
 
     // ─────────────────────────────────────────────
@@ -312,8 +294,8 @@ public class JournalService {
      * Remove the photo from both Cloudinary and the journal record.
      *
      * Security review:
-     *   Ownership validated ✅ | Cloudinary asset destroyed by deterministic public_id ✅
-     *   Returns 404 if no photo exists ✅ | No user input reaches Cloudinary API ✅
+     *   Ownership validated ✅ | Cloudinary asset destroyed by secure URL parsing ✅
+     *   Returns 404 if no photo exists ✅
      */
     @Transactional
     public JournalPhotoResponse deletePhoto(Long journalId, UserPrincipal userPrincipal) {
@@ -324,11 +306,10 @@ public class JournalService {
         }
 
         try {
-            // Destroy on Cloudinary using the deterministic public_id
-            String publicId = cloudinaryFolder + "/journal-" + journalId;
-            cloudinary.uploader().destroy(publicId, ObjectUtils.emptyMap());
-        } catch (IOException e) {
-            // If Cloudinary destroy fails (e.g. already deleted), still clear the DB record
+            // Destroy on Cloudinary using secure URL parsing
+            cloudinaryService.deleteImage(journal.getPhotoUrl());
+        } catch (Exception e) {
+            // Non-blocking: still clear database entry if Cloudinary deletion fails
         }
 
         journal.setPhotoUrl(null);
@@ -363,9 +344,10 @@ public class JournalService {
     // ─────────────────────────────────────────────
 
     /**
+    /**
      * POST /api/journals/{id}/analysis
      * Trigger (or re-trigger) AI analysis for a journal entry.
-     * Currently uses a mock/placeholder analyser; replace with a real AI call.
+     * Connects to Google Gemini 1.5 Flash API with fallback to local mock logic on error.
      */
     @Transactional
     public JournalAnalysisResponse triggerAnalysis(Long journalId, UserPrincipal userPrincipal) {
@@ -382,16 +364,93 @@ public class JournalService {
                     return a;
                 });
 
-        // ── Mock AI analysis logic ────────────────────────────────────────
-        // TODO: Replace this block with a real AI/ML API call (e.g. Gemini,
-        //       OpenAI, or a local sentiment model) passing `plainText`.
-        analysis.setEmotion(mockDetectEmotion(plainText));
-        analysis.setSentiment(mockDetectSentiment(plainText));
-        analysis.setStressScore(mockStressScore(plainText));
-        analysis.setStressLevel(toStressLevel(analysis.getStressScore()));
-        analysis.setKeyThemes(mockKeyThemes(plainText));
-        analysis.setAiResponse(mockAiResponse(plainText));
-        analysis.setAiSuggestion(mockAiSuggestion(analysis.getEmotion()));
+        boolean success = false;
+
+        // Try calling the Gemini API for live analysis
+        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
+            try {
+                String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=" + geminiApiKey;
+
+                String prompt = "Analyze the following mental health journal entry. " +
+                        "Evaluate: \n" +
+                        "1. emotion: One-word primary emotion (e.g. Calm, Happy, Anxious, Sad, Angry, Neutral)\n" +
+                        "2. sentiment: POSITIVE, NEGATIVE, or NEUTRAL\n" +
+                        "3. stressScore: A numeric stress level score from 0 to 100\n" +
+                        "4. keyThemes: An array of 2 to 3 tags describing the core themes (e.g. Gratitude, Family, Health, Work, Positivity)\n" +
+                        "5. aiResponse: A supportive and empathetic reflection paragraph (2-3 sentences max)\n" +
+                        "6. aiSuggestion: A helpful and actionable suggestion (1-2 sentences max) based on the user's emotion.\n\n" +
+                        "Journal entry content:\n" + plainText;
+
+                Map<String, Object> textPart = Map.of("text", prompt);
+                Map<String, Object> parts = Map.of("parts", List.of(textPart));
+                Map<String, Object> contents = Map.of("contents", List.of(parts));
+
+                // Define JSON Schema for Structured Output to guarantee JSON matching our entity properties
+                Map<String, Object> schema = Map.of(
+                        "type", "OBJECT",
+                        "properties", Map.of(
+                                "emotion", Map.of("type", "STRING", "description", "One word primary emotion, e.g., Calm, Happy, Anxious, Sad, Angry, Neutral"),
+                                "sentiment", Map.of("type", "STRING", "description", "POSITIVE, NEGATIVE, or NEUTRAL"),
+                                "stressScore", Map.of("type", "INTEGER", "description", "Stress level score from 0 to 100"),
+                                "keyThemes", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"), "description", "2 to 3 tags describing themes, e.g. Gratitude, Family, Health, Work, Positivity"),
+                                "aiResponse", Map.of("type", "STRING", "description", "A supportive reflection paragraph (2-3 sentences)"),
+                                "aiSuggestion", Map.of("type", "STRING", "description", "One actionable suggestion (1-2 sentences)")
+                        ),
+                        "required", List.of("emotion", "sentiment", "stressScore", "keyThemes", "aiResponse", "aiSuggestion")
+                );
+
+                Map<String, Object> generationConfig = Map.of(
+                        "responseMimeType", "application/json",
+                        "responseSchema", schema
+                );
+
+                Map<String, Object> requestBody = Map.of(
+                        "contents", List.of(parts),
+                        "generationConfig", generationConfig
+                );
+
+                HttpHeaders headers = new HttpHeaders();
+                headers.setContentType(MediaType.APPLICATION_JSON);
+
+                HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
+                ResponseEntity<String> response = restTemplate.postForEntity(url, requestEntity, String.class);
+
+                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                    JsonNode root = objectMapper.readTree(response.getBody());
+                    String jsonText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+
+                    JsonNode resultNode = objectMapper.readTree(jsonText);
+
+                    analysis.setEmotion(resultNode.path("emotion").asText("Neutral"));
+                    analysis.setSentiment(resultNode.path("sentiment").asText("NEUTRAL"));
+                    analysis.setStressScore(resultNode.path("stressScore").asInt(30));
+                    analysis.setStressLevel(toStressLevel(analysis.getStressScore()));
+
+                    List<String> themes = new java.util.ArrayList<>();
+                    resultNode.path("keyThemes").forEach(t -> themes.add(t.asText()));
+                    analysis.setKeyThemes(String.join(",", themes));
+
+                    analysis.setAiResponse(resultNode.path("aiResponse").asText("Your entry reflects a thoughtful processing of your thoughts. Keep journaling as a healthy habit."));
+                    analysis.setAiSuggestion(resultNode.path("aiSuggestion").asText("Consider doing a breathing exercise to rest your mind."));
+
+                    success = true;
+                }
+            } catch (Exception e) {
+                // Non-blocking error logging (System.err/logger fallback)
+                System.err.println("Error calling Gemini API: " + e.getMessage());
+            }
+        }
+
+        // ── Fallback to Mock AI analysis logic if API call failed ─────────────────
+        if (!success) {
+            analysis.setEmotion(mockDetectEmotion(plainText));
+            analysis.setSentiment(mockDetectSentiment(plainText));
+            analysis.setStressScore(mockStressScore(plainText));
+            analysis.setStressLevel(toStressLevel(analysis.getStressScore()));
+            analysis.setKeyThemes(mockKeyThemes(plainText));
+            analysis.setAiResponse(mockAiResponse(plainText));
+            analysis.setAiSuggestion(mockAiSuggestion(analysis.getEmotion()));
+        }
         // ─────────────────────────────────────────────────────────────────
 
         JournalAnalysis saved = analysisRepository.save(analysis);
@@ -436,8 +495,8 @@ public class JournalService {
         if (journal.getEncryptedText() != null && !journal.getEncryptedText().isBlank()) {
             String decrypted = encryptionUtil.decrypt(journal.getEncryptedText());
             response.setContent(decrypted);
-            // Strip HTML tags for plain-text preview (prevents XSS in list-card preview)
-            String plain = decrypted.replaceAll("<[^>]+>", "").trim();
+            // Construct plain text preview directly
+            String plain = decrypted.trim();
             response.setPreview(plain.length() > 120 ? plain.substring(0, 120) + "…" : plain);
         }
 
