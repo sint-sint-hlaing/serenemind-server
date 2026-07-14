@@ -1,8 +1,8 @@
 package com.mental.controller;
 
 import com.mental.dto.meditation.MeditationDashboardResponse;
-import com.mental.dto.MeditationResponse;
 import com.mental.dto.MeditationSessionRequest;
+import com.mental.dto.meditation.MeditationResponse;
 import com.mental.service.MeditationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/meditation")
+@RequestMapping("/api/meditations")
 @RequiredArgsConstructor
 public class MeditationController {
 

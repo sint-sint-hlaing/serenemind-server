@@ -12,5 +12,5 @@ public record GoalRequest(
         String description,
 
         @Min(value = 1, message = "Target days must be at least 1")
-        int targetDays
+        Integer targetDays
 ) {}

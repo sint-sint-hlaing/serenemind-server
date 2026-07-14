@@ -1,6 +1,5 @@
 package com.mental.dto.meditation;
 
-import com.mental.dto.MeditationResponse;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

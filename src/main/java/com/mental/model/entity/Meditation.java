@@ -23,7 +23,7 @@ public class Meditation extends BaseEntity {
 
 
     @Column(nullable = false)
-    private Integer duration; // seconds
+    private String duration; // seconds
 
     private String imageUrl;
     private String audioUrl;
