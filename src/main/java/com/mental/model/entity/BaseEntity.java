@@ -6,6 +6,8 @@ import lombok.Setter;
 
 import java.time.Instant;
 
+import static java.time.Instant.now;
+
 @MappedSuperclass
 @Getter
 @Setter
@@ -15,17 +17,20 @@ public abstract class BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(updatable = false)
     private Instant createdAt;
     private Instant updatedAt;
 
     @PrePersist
     public void onCreate() {
-        createdAt = Instant.now();
-        updatedAt = Instant.now();
+        Instant now = Instant.now();
+
+        createdAt = now();
+        updatedAt = now();
     }
 
     @PreUpdate
     public void onUpdate() {
-        updatedAt = Instant.now();
+        updatedAt =Instant.now();
     }
 }

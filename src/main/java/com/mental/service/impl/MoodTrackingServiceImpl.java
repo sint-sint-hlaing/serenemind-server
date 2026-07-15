@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
@@ -60,15 +61,22 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
     @Override
     @Transactional
     public void saveMood(String email, MoodRequest request) {
+
         User user = findUserByEmail(email);
 
-        // Standard constructor approach
+
         MoodEntry entry = new MoodEntry();
+
         entry.setUser(user);
+
         entry.setMood(request.mood());
+
         entry.setIntensity(request.intensity());
+
         entry.setNote(request.note());
-        entry.setCreatedAt(Instant.now());
+
+        entry.setDate(LocalDate.now());
+
 
         moodTrackingRepository.save(entry);
     }

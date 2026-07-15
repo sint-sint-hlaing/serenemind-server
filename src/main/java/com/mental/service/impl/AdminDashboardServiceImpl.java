@@ -28,6 +28,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     private final MeditationRepository meditationRepository;
     private final AuditLogRepository auditLogRepository;
 
+    /*
     @Override
     public DashboardStatsDto getDashboardOverview() {
         return new DashboardStatsDto(
@@ -38,7 +39,7 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 meditationRepository.count(),
                 getMoodDistributionData()
         );
-    }
+    }*/
 
     @Override
     public Page<UserDto> getAllUsers(Pageable pageable) {

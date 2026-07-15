@@ -6,6 +6,9 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "mood_entries")
 @Getter
@@ -21,6 +24,7 @@ public class MoodEntry extends BaseEntity {
     private int intensity;
 
     private String note;
+    private LocalDate date;
 
     @OneToOne(mappedBy = "moodEntry", cascade = CascadeType.ALL)
     private MoodAnalysis analysis;

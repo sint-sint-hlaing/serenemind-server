@@ -14,28 +14,79 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface MoodTrackingRepository extends JpaRepository<MoodEntry,Long> {
-    List<MoodEntry> findByUserEmailOrderByCreatedAtDesc(String email);
-    @Query("SELECT m FROM MoodEntry m WHERE m.user.email = :email AND m.createdAt >= :startDate")
-    List<MoodEntry> findWeeklyData(@Param("email") String email, @Param("startDate") Instant startDate);
+public interface MoodTrackingRepository
+        extends JpaRepository<MoodEntry,Long> {
 
-    @Query("SELECT m FROM MoodEntry m WHERE m.user.email = :email AND m.createdAt >= :startDate")
-    List<MoodEntry> findMonthlyData(@Param("email") String email, @Param("startDate") Instant startDate);
 
-    @Query("SELECT m.mood, COUNT(m) FROM MoodEntry m GROUP BY m.mood")
+    List<MoodEntry> findByUserEmailOrderByCreatedAtDesc(
+            String email
+    );
+
+
+    @Query("""
+            SELECT m FROM MoodEntry m 
+            WHERE m.user.email = :email 
+            AND m.createdAt >= :startDate
+            """)
+    List<MoodEntry> findWeeklyData(
+            @Param("email") String email,
+            @Param("startDate") Instant startDate
+    );
+
+
+    @Query("""
+            SELECT m.mood, COUNT(m)
+            FROM MoodEntry m
+            GROUP BY m.mood
+            """)
     List<Object[]> getMoodDistribution();
-    @Query("SELECT m FROM MoodEntry m WHERE m.user.username = :username " +
-            "AND YEAR(m.createdAt) = :year AND MONTH(m.createdAt) = :month")
-    List<MoodEntry> findByYearAndMonth(String username, int year, int month);
 
-    List<MoodEntry> findByUserUsername(String username);
 
-    @Query("SELECT m FROM MoodEntry m WHERE m.user.email = :email")
-    List<MoodEntry> findByEmail(@Param("email") String email);
+    @Query("""
+            SELECT m FROM MoodEntry m
+            WHERE m.user.username = :username
+            AND YEAR(m.createdAt)=:year
+            AND MONTH(m.createdAt)=:month
+            """)
+    List<MoodEntry> findByYearAndMonth(
+            String username,
+            int year,
+            int month
+    );
 
-    Optional<MoodEntry> findTopByUserOrderByCreatedAtDesc(User user);
+
+    List<MoodEntry> findByUserUsername(
+            String username
+    );
+
+
+    @Query("""
+            SELECT m FROM MoodEntry m
+            WHERE m.user.email = :email
+            """)
+    List<MoodEntry> findByEmail(
+            @Param("email") String email
+    );
+
+
+    Optional<MoodEntry> findTopByUserOrderByCreatedAtDesc(
+            User user
+    );
+
+
     Optional<MoodEntry> findByUserAndDate(
             User user,
             LocalDate date
     );
+    @Query("""
+        SELECT m FROM MoodEntry m
+        WHERE m.user.email = :email
+        AND m.createdAt >= :startDate
+        """)
+    List<MoodEntry> findMonthlyData(
+            @Param("email") String email,
+            @Param("startDate") Instant startDate
+    );
+
 }
+
