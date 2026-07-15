@@ -14,6 +14,7 @@ public class EmotionService {
 
     private final RestTemplate restTemplate;
 
+    /*
     public EmotionResponse analyze(String text){
 
         EmotionRequest request =
@@ -27,8 +28,8 @@ public class EmotionService {
 
                 EmotionResponse.class
 
-        );
+        );**/
 
-    }
+
 
 }

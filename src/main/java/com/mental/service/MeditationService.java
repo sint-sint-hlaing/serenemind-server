@@ -30,6 +30,7 @@ public class MeditationService {
     private final UserRepository userRepository;
 
 
+
     @Transactional(readOnly = true)
     public List<MeditationResponse> getAll(){
 
@@ -38,6 +39,7 @@ public class MeditationService {
                 .map(this::toResponse)
                 .toList();
     }
+
 
 
     @Transactional(readOnly = true)
@@ -54,17 +56,22 @@ public class MeditationService {
     }
 
 
+
+
     @Transactional(readOnly = true)
     public MeditationDashboardResponse getDashboard(){
 
+
         List<Meditation> meditations =
                 meditationRepository.findAll();
+
 
 
         List<MeditationResponse> recommended =
                 meditations.stream()
                         .map(this::toResponse)
                         .toList();
+
 
 
         MeditationResponse featured =
@@ -78,7 +85,7 @@ public class MeditationService {
                 meditations.stream()
                         .map(m ->
                                 new MeditationCategoryResponse(
-                                        m.getCategory().name(),
+                                        m.getCategories().name(),
                                         "🧘"
                                 )
                         )
@@ -96,10 +103,13 @@ public class MeditationService {
 
 
 
+
+
     @Transactional
     public void completeSession(
             MeditationSessionRequest request
     ){
+
 
         String email =
                 SecurityContextHolder
@@ -113,7 +123,7 @@ public class MeditationService {
                 userRepository.findByEmail(email)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
-                                        "User not found"+email
+                                        "User not found"
                                 ));
 
 
@@ -142,13 +152,18 @@ public class MeditationService {
                         .build();
 
 
+
         sessionRepository.save(session);
     }
 
 
 
+
+
+
     @Transactional(readOnly = true)
     public List<MeditationResponse> getHistory(){
+
 
         String email =
                 SecurityContextHolder
@@ -171,10 +186,68 @@ public class MeditationService {
                 .findByUserOrderByCreatedAtDesc(user)
                 .stream()
                 .map(session ->
-                        toResponse(session.getMeditation())
+                        toResponse(
+                                session.getMeditation()
+                        )
                 )
                 .toList();
+
     }
+
+
+
+
+
+
+    public List<MeditationResponse> getRecommendations(
+            Long userId
+    ){
+
+
+        return meditationRepository
+                .findRecommendedMeditations(userId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+    }
+
+
+
+
+
+
+    public List<MeditationResponse> search(
+            String keyword
+    ){
+
+        return meditationRepository
+                .searchByKeyword(keyword)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+    }
+
+
+
+
+
+
+    public List<MeditationResponse> getContinueListening(
+            Long userId
+    ){
+
+        return sessionRepository
+                .findContinueListening(userId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+    }
+
+
+
 
 
 
@@ -185,9 +258,11 @@ public class MeditationService {
         return MeditationResponse.builder()
                 .id(meditation.getId())
                 .title(meditation.getTitle())
-                .category(meditation.getCategory().name())
-                .duration(meditation.getDuration())
                 .description(meditation.getDescription())
+                .category(
+                        meditation.getCategories().name()
+                )
+                .duration(meditation.getDuration())
                 .audioUrl(meditation.getAudioUrl())
                 .imageUrl(meditation.getImageUrl())
                 .build();
