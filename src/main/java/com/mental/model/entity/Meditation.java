@@ -1,10 +1,13 @@
 package com.mental.model.entity;
 
 import com.mental.model.entity.enums.MeditationCategory;
+import com.mental.model.entity.enums.MeditationStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "meditations")
@@ -19,15 +22,40 @@ public class Meditation extends BaseEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private MeditationCategory category;
-
+    private MeditationCategory categories;
 
     @Column(nullable = false)
-    private Integer duration; // seconds
+    private String duration; // seconds
 
-
+    private String imageUrl;
+    @Column(nullable = false)
     private String audioUrl;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MeditationStatus status = MeditationStatus.DRAFT;
 
-    private String description;
-}
+    @Column(nullable = false)
+    private Boolean featured = false;
+
+    @Column(nullable = false)
+    private Boolean premium = false;
+
+    @Column(nullable = false)
+    private Long listenCount = 0L;
+
+    @Column(nullable=false)
+    private Integer durationSeconds;
+
+
+    @Column(nullable=false)
+    private Integer difficulty;
+
+
+    private Integer viewCount;
+
+
+    private LocalDateTime publishedAt;
+    @Lob
+    @Column(columnDefinition = "TEXT")
+    private String description;}

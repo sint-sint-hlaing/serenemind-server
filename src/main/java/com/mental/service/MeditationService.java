@@ -1,8 +1,10 @@
 package com.mental.service;
 
-import com.mental.dto.MeditationHistoryResponse;
-import com.mental.dto.MeditationResponse;
 import com.mental.dto.MeditationSessionRequest;
+import com.mental.dto.meditation.MeditationCategoryResponse;
+import com.mental.dto.meditation.MeditationDashboardResponse;
+import com.mental.dto.meditation.MeditationResponse;
+import com.mental.exception.ResourceNotFoundException;
 import com.mental.model.entity.Meditation;
 import com.mental.model.entity.MeditationSession;
 import com.mental.model.entity.User;
@@ -10,6 +12,7 @@ import com.mental.repository.MeditationRepository;
 import com.mental.repository.MeditationSessionRepository;
 import com.mental.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,10 +26,9 @@ public class MeditationService {
 
 
     private final MeditationRepository meditationRepository;
-
     private final MeditationSessionRepository sessionRepository;
-
     private final UserRepository userRepository;
+
 
 
     @Transactional(readOnly = true)
@@ -34,33 +36,95 @@ public class MeditationService {
 
         return meditationRepository.findAll()
                 .stream()
-                .map(m -> MeditationResponse.builder()
-
-                        .id(m.getId())
-                        .title(m.getTitle())
-                        .category(m.getCategory().name())
-                        .duration(m.getDuration())
-                        .audioUrl(m.getAudioUrl())
-                        .description(m.getDescription())
-
-                        .build())
-
+                .map(this::toResponse)
                 .toList();
-
     }
 
 
+
+    @Transactional(readOnly = true)
+    public MeditationResponse getById(Long id){
+
+        Meditation meditation =
+                meditationRepository.findById(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Meditation not found"
+                                ));
+
+        return toResponse(meditation);
+    }
+
+
+
+
+    @Transactional(readOnly = true)
+    public MeditationDashboardResponse getDashboard(){
+
+
+        List<Meditation> meditations =
+                meditationRepository.findAll();
+
+
+
+        List<MeditationResponse> recommended =
+                meditations.stream()
+                        .map(this::toResponse)
+                        .toList();
+
+
+
+        MeditationResponse featured =
+                recommended.isEmpty()
+                        ? null
+                        : recommended.get(0);
+
+
+
+        List<MeditationCategoryResponse> categories =
+                meditations.stream()
+                        .map(m ->
+                                new MeditationCategoryResponse(
+                                        m.getCategories().name(),
+                                        "🧘"
+                                )
+                        )
+                        .distinct()
+                        .toList();
+
+
+
+        return new MeditationDashboardResponse(
+                featured,
+                categories,
+                recommended
+        );
+    }
+
+
+
+
+
+    @Transactional
     public void completeSession(
-            MeditationSessionRequest request,
-            String email
+            MeditationSessionRequest request
     ){
+
+
+        String email =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getName();
+
 
 
         User user =
                 userRepository.findByEmail(email)
-                        .orElseThrow(
-                                ()-> new RuntimeException("User not found")
-                        );
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "User not found"
+                                ));
 
 
 
@@ -68,77 +132,140 @@ public class MeditationService {
                 meditationRepository.findById(
                                 request.getMeditationId()
                         )
-                        .orElseThrow(
-                                ()-> new RuntimeException("Meditation not found")
-                        );
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Meditation not found"
+                                ));
 
 
 
         MeditationSession session =
                 MeditationSession.builder()
-
                         .user(user)
-
                         .meditation(meditation)
-
                         .completed(request.isCompleted())
-
                         .completedAt(
                                 request.isCompleted()
                                         ? Instant.now()
                                         : null
                         )
-
                         .build();
 
 
 
         sessionRepository.save(session);
-
     }
 
 
+
+
+
+
     @Transactional(readOnly = true)
-    public List<MeditationHistoryResponse> history(
-            String email
-    ){
+    public List<MeditationResponse> getHistory(){
+
+
+        String email =
+                SecurityContextHolder
+                        .getContext()
+                        .getAuthentication()
+                        .getName();
+
 
 
         User user =
                 userRepository.findByEmail(email)
-                        .orElseThrow();
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "User not found"
+                                ));
 
 
 
         return sessionRepository
                 .findByUserOrderByCreatedAtDesc(user)
-
                 .stream()
-
-                .map(s ->
-                        MeditationHistoryResponse.builder()
-
-                                .title(
-                                        s.getMeditation().getTitle()
-                                )
-
-                                .duration(
-                                        s.getMeditation().getDuration()
-                                )
-
-                                .completed(
-                                        s.isCompleted()
-                                )
-
-                                .completedAt(
-                                        s.getCompletedAt()
-                                )
-
-                                .build()
+                .map(session ->
+                        toResponse(
+                                session.getMeditation()
+                        )
                 )
-
                 .toList();
 
+    }
+
+
+
+
+
+
+    public List<MeditationResponse> getRecommendations(
+            Long userId
+    ){
+
+
+        return meditationRepository
+                .findRecommendedMeditations(userId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+    }
+
+
+
+
+
+
+    public List<MeditationResponse> search(
+            String keyword
+    ){
+
+        return meditationRepository
+                .searchByKeyword(keyword)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+    }
+
+
+
+
+
+
+    public List<MeditationResponse> getContinueListening(
+            Long userId
+    ){
+
+        return sessionRepository
+                .findContinueListening(userId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+
+    }
+
+
+
+
+
+
+    private MeditationResponse toResponse(
+            Meditation meditation
+    ){
+
+        return MeditationResponse.builder()
+                .id(meditation.getId())
+                .title(meditation.getTitle())
+                .description(meditation.getDescription())
+                .category(
+                        meditation.getCategories().name()
+                )
+                .duration(meditation.getDuration())
+                .audioUrl(meditation.getAudioUrl())
+                .imageUrl(meditation.getImageUrl())
+                .build();
     }
 
 }
