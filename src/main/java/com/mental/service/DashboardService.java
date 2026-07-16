@@ -1,7 +1,7 @@
 package com.mental.service;
 
-import com.mental.dto.WeeklyData;
 import com.mental.dto.home.*;
+import com.mental.dto.mood.WeeklyMoodResponse;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.model.entity.MoodEntry;
 import com.mental.model.entity.User;
@@ -149,20 +149,12 @@ public class DashboardService {
     }
 
 
-
-
     private Integer getWeeklyPercentage(User user, DayOfWeek day){
-
-
-        LocalDate date = LocalDate.now()
-                .with(day);
-
-
+        LocalDate date = LocalDate.now().with(day);
         return moodRepository
-                .findByUserAndDate(user, date)
+                .findTopByUserAndDateOrderByCreatedAtDesc(user, date) // အပေါ်က method အသစ်ကို သုံးပါ
                 .map(mood -> getMoodPercentage(mood.getMood()))
                 .orElse(0);
-
     }
 
 

@@ -2,6 +2,7 @@ package com.mental.service.impl;
 
 import com.mental.dto.mood.DailyMoodResponse;
 import com.mental.dto.mood.MoodRequest;
+import com.mental.dto.mood.WeeklyMoodResponse;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.mapper.MoodMapper;
 import com.mental.model.entity.MoodEntry;
@@ -47,6 +48,11 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
     }
 
     @Override
+    public WeeklyMoodResponse getWeeklyMood(String email) {
+        return null;
+    }
+
+    @Override
     @Transactional
     public void deleteMood(Long id, String email) {
         MoodEntry mood = moodTrackingRepository.findById(id)
@@ -72,7 +78,11 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
         entry.setMood(request.mood());
 
         entry.setIntensity(request.intensity());
-
+        entry.setScore(
+                request.score() == null
+                        ? 0
+                        : request.score()
+        );
         entry.setNote(request.note());
 
         entry.setDate(LocalDate.now());
@@ -99,10 +109,37 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
         return moodTrackingRepository.findByYearAndMonth(email, year, month)
                 .stream()
                 .map(entry -> new DailyMoodResponse(
-                        entry.getCreatedAt().toString(),
-                        entry.getMood().name(),
+                        entry.getDate(),
+                        entry.getMood(),
                         entry.getIntensity(),
+                        entry.getScore(),
                         entry.getNote()))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public DailyMoodResponse getMoodByDate(String email, LocalDate date) {
+        MoodEntry mood =
+                moodTrackingRepository
+                        .findTopByUserEmailAndDateOrderByCreatedAtDesc(
+                                email,
+                                date
+                        )
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException(
+                                        "Mood not found"
+                                )
+                        );
+
+
+        return new DailyMoodResponse(
+                mood.getDate(),
+                mood.getMood(),
+                mood.getScore(),
+                mood.getScore(),
+                mood.getNote()
+        );
+
+
     }
 }

@@ -1,4 +1,4 @@
-package com.mental.dto.home;
+package com.mental.dto.mood;
 
 
 import com.mental.model.entity.enums.MoodType;

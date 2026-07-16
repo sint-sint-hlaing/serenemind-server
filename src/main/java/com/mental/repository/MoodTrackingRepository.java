@@ -21,7 +21,8 @@ public interface MoodTrackingRepository
     List<MoodEntry> findByUserEmailOrderByCreatedAtDesc(
             String email
     );
-
+    // MoodTrackingRepository.java ထဲတွင်
+    Optional<MoodEntry> findTopByUserAndDateOrderByCreatedAtDesc(User user, LocalDate date);
 
     @Query("""
             SELECT m FROM MoodEntry m 
@@ -29,6 +30,15 @@ public interface MoodTrackingRepository
             AND m.createdAt >= :startDate
             """)
     List<MoodEntry> findWeeklyData(
+            @Param("email") String email,
+            @Param("startDate") Instant startDate
+    );
+    @Query("""
+        SELECT m FROM MoodEntry m
+        WHERE m.user.email = :email
+        AND m.createdAt >= :startDate
+    """)
+    List<MoodEntry> findMonthlyData(
             @Param("email") String email,
             @Param("startDate") Instant startDate
     );
@@ -43,15 +53,15 @@ public interface MoodTrackingRepository
 
 
     @Query("""
-            SELECT m FROM MoodEntry m
-            WHERE m.user.username = :username
-            AND YEAR(m.createdAt)=:year
-            AND MONTH(m.createdAt)=:month
-            """)
+SELECT m FROM MoodEntry m
+WHERE m.user.email = :email
+AND YEAR(m.date)=:year
+AND MONTH(m.date)=:month
+""")
     List<MoodEntry> findByYearAndMonth(
-            String username,
-            int year,
-            int month
+            @Param("email") String email,
+            @Param("year") int year,
+            @Param("month") int month
     );
 
 
@@ -72,20 +82,20 @@ public interface MoodTrackingRepository
     Optional<MoodEntry> findTopByUserOrderByCreatedAtDesc(
             User user
     );
-
+    Optional<MoodEntry> findTopByUserEmailAndDateOrderByCreatedAtDesc(
+            String email,
+            LocalDate date
+    );
 
     Optional<MoodEntry> findByUserAndDate(
             User user,
             LocalDate date
     );
-    @Query("""
-        SELECT m FROM MoodEntry m
-        WHERE m.user.email = :email
-        AND m.createdAt >= :startDate
-        """)
-    List<MoodEntry> findMonthlyData(
-            @Param("email") String email,
-            @Param("startDate") Instant startDate
+
+
+    Optional<MoodEntry> findByUserEmailAndDate(
+            String email,
+            LocalDate date
     );
 
 }

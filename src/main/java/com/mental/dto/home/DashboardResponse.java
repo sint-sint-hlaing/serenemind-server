@@ -1,5 +1,6 @@
 package com.mental.dto.home;
 
+import com.mental.dto.mood.WeeklyMoodResponse;
 import lombok.Builder;
 
 import java.time.LocalDate;
