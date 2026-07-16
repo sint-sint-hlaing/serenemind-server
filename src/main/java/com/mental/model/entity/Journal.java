@@ -19,7 +19,6 @@ public class Journal extends BaseEntity {
     private boolean flagged;
     private String flagReason;
 
-
     @Lob
     private String encryptedText;
 

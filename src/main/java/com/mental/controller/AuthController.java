@@ -29,7 +29,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse register(
+    public AuthResponse rregister(
             @RequestBody RegisterRequest req) {
 
         return authService.register(req);
