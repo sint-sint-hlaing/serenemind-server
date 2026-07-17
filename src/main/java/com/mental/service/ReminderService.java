@@ -22,8 +22,8 @@ public class ReminderService {
     private final ReminderRepository reminderRepository;
     private final NotificationService notificationService;
     private final UserRepository userRepository;
+    private final FcmPushService fcmPushService;
 
-    // 👈 Schedulers သို့မဟုတ် Background Task တစ်ခုခုကနေ Reminder Missed ဖြစ်ကြောင်း လှမ်းခေါ်မည့် Method
     @Transactional
     public void triggerReminderMissed(Long reminderId) {
         Reminder reminder = reminderRepository.findById(reminderId)
@@ -32,18 +32,17 @@ public class ReminderService {
         User user = userRepository.findById(reminder.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + reminder.getUserId()));
 
-        // Noti ထဲတွင် ပြသမည့် စာသားပုံစံ ပြင်ဆင်ခြင်း
         String title = "Reminder missed";
         String message = "You missed your reminder \"" + reminder.getTitle() + "\" at " + reminder.getReminderTime();
 
-        // NotificationService Helper Method ကို ခေါ်ယူခြင်း
+        // ၁။ တွင်းဖြစ် Database ထဲ Noti သိမ်းခြင်း (ဒီအတိုင်းထားပါ)
         notificationService.createNotification(
-                user,               // Noti လက်ခံမည့် အသုံးပြုသူ
-                title,              // Title
-                message,            // Message
-                "REMINDER",         // Noti Icon ပြောင်းရန်အတွက် Type
-                reminder.getId(),   // 👈 Target ID: Reminder ID ကို ပေးရပါမည်
-                "REMINDER"          // 👈 Target Type: Frontend က Reminder Screen ကို သွားရန်
+                user, title, message, "REMINDER", reminder.getId(), "REMINDER"
+        );
+
+        // ၂။ 👈 Mobile ဖုန်းဆီ Real-time Alert တက်လာအောင် FCM Push Notification ပို့ခြင်း
+        fcmPushService.sendPushNotificationToUser(
+                user, title, message, reminder.getId(), "REMINDER"
         );
     }
 

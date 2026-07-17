@@ -2,6 +2,7 @@ package com.mental.controller;
 
 import com.mental.dto.*;
 import com.mental.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 
@@ -29,7 +30,7 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse rregister(
+    public AuthResponse register(
             @RequestBody RegisterRequest req) {
 
         return authService.register(req);
@@ -39,7 +40,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthResponse login(
-            @RequestBody LoginRequest req) {
+            @RequestBody @Valid LoginRequest req) {
 
         return authService.login(req);
 
