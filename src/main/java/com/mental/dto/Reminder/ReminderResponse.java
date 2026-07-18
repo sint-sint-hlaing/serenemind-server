@@ -9,6 +9,7 @@ public class ReminderResponse {
     private Long id;
     private String title;
     private String repeatType;
+    private String repeatDays;
     private LocalTime reminderTime;
     private LocalDate startDate;
     private String reminderTone;

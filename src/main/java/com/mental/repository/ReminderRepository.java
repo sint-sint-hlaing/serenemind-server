@@ -21,9 +21,17 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
     // Find a specific reminder belonging to a specific user (for security/ownership validation)
     Optional<Reminder> findByIdAndUserId(Long id, Long userId);
 
-    @Query("SELECT r FROM Reminder r WHERE r.enabled = true AND " +
-            "CAST(CONCAT(r.startDate, 'T', r.reminderTime) AS localdatetime) <= :now")
-    List<Reminder> findPendingReminders(@Param("now") LocalDateTime now);
+//    @Query("SELECT r FROM Reminder r WHERE r.enabled = true AND " +
+//            "CAST(CONCAT(r.startDate, 'T', r.reminderTime) AS localdatetime) <= :now")
+//    List<Reminder> findPendingReminders(@Param("now") LocalDateTime now);
+
+    @Query("SELECT r FROM Reminder r WHERE r.enabled = true AND (" +
+            "r.startDate < :currentDate OR " +
+            "(r.startDate = :currentDate AND r.reminderTime <= :currentTime))")
+    List<Reminder> findPendingReminders(
+            @Param("currentDate") LocalDate currentDate,
+            @Param("currentTime") LocalTime currentTime
+    );
 
     List<Reminder> findByEnabledTrueAndReminderTimeAndStartDateLessThanEqual(LocalTime reminderTime, LocalDate currentDate);
 }
