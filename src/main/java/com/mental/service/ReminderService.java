@@ -27,7 +27,7 @@ public class ReminderService {
 
     @Transactional(readOnly = true)
     public List<ReminderResponse> getRemindersByUserId(UserPrincipal userPrincipal) {
-        return reminderRepository.findByUserId(userPrincipal.getId())
+        return reminderRepository.findByUserIdSorted(userPrincipal.getId())
                 .stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());

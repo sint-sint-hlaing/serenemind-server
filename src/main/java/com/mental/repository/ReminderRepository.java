@@ -33,5 +33,10 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
             @Param("currentTime") LocalTime currentTime
     );
 
+    @Query("SELECT r FROM Reminder r WHERE r.userId = :userId " +
+            "ORDER BY CASE WHEN r.enabled = true THEN 0 ELSE 1 END ASC, " +
+            "r.startDate ASC, r.reminderTime ASC")
+    List<Reminder> findByUserIdSorted(@Param("userId") Long userId);
+
     List<Reminder> findByEnabledTrueAndReminderTimeAndStartDateLessThanEqual(LocalTime reminderTime, LocalDate currentDate);
 }
