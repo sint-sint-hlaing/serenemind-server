@@ -95,7 +95,7 @@ public class NotificationService {
 
         notificationRepository.save(noti);
 
-//        fcmNotificationService.sendPushNotification(recipient, title, message, targetId, targetType);
+        fcmPushService.sendPushNotificationToUser(recipient, title, message, targetId, targetType);
     }
 
     // Noti ကို နှိပ်လိုက်လျှင် Read true လုပ်ပြီး Target အချက်အလက် ပြန်ပေးမည်

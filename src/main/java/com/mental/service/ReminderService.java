@@ -80,8 +80,11 @@ public class ReminderService {
         String title = "Reminder Alert";
         String message = "It's time for your reminder: \"" + reminder.getTitle() + "\"";
 
+        // ၁။ Database ထဲ Noti Record ဝင်အောင် ဆောက်ပါသည် (ဒီကောင်ကိုပဲ ချန်ထားပါ)
         notificationService.createNotification(user, title, message, "REMINDER", reminder.getId(), "REMINDER");
-        fcmPushService.sendPushNotificationToUser(user, title, message, reminder.getId(), "REMINDER");
+
+        // ❌ ၂။ 👈 ဤလိုင်းကို လုံးဝ ဖြတ်ပစ်ပါ သို့မဟုတ် Comment ပိတ်ပါ (ဒါမှ Noti ၂ စောင် မပွားတော့မှာပါ)
+        // fcmPushService.sendPushNotificationToUser(user, title, message, reminder.getId(), "REMINDER");
     }
 
     // Helper method to convert Entity to Response DTO
