@@ -21,7 +21,7 @@ public class ReminderSchedulerService {
     private final ReminderService reminderService;
 
     @Scheduled(fixedRate = 60000)
-    @Transactional
+    @Transactional // 👈 Transaction စတင်သည်
     public void checkPendingReminders() {
         LocalDateTime now = LocalDateTime.now();
 
@@ -38,10 +38,7 @@ public class ReminderSchedulerService {
 
         for (Reminder reminder : pendingReminders) {
             try {
-                // ၁။ Noti ပို့မယ်
-                reminderService.triggerReminderAlert(reminder.getId());
-
-                // ၂။ Repeat Type အလိုက် Logic စစ်မယ်
+                // 🎯 ၁။ ၎င်း Reminder အတွက် Repeat Type အလိုက် ရက်စွဲ/အခြေအနေကို ချက်ချင်း အရင်ပြင်ဆင်ပါမည်
                 String repeatType = reminder.getRepeatType();
 
                 if (repeatType == null || "ONCE".equalsIgnoreCase(repeatType)) {
@@ -52,17 +49,15 @@ public class ReminderSchedulerService {
                             reminder.setStartDate(reminder.getStartDate().plusDays(1));
                             break;
 
-                        case "CUSTOM_DAYS": // 👈 ရက်အလိုက် ထပ်ခါတလဲလဲ လုပ်မည့် Logic အသစ်
+                        case "CUSTOM_DAYS":
                             if (reminder.getRepeatDays() != null && !reminder.getRepeatDays().isEmpty()) {
                                 LocalDate nextDate = reminder.getStartDate();
                                 boolean foundNextMatch = false;
 
-                                // လာမယ့် ၇ ရက်အတွင်း အသုံးပြုသူရွေးထားတဲ့ နေ့နဲ့ ကိုက်ညီမယ့်ရက်ကို လိုက်ရှာမယ်
                                 for (int i = 1; i <= 7; i++) {
                                     nextDate = nextDate.plusDays(1);
-                                    String dayOfWeekName = nextDate.getDayOfWeek().name(); // ဥပမာ - "MONDAY"
+                                    String dayOfWeekName = nextDate.getDayOfWeek().name();
 
-                                    // DB ထဲက သိမ်းထားတဲ့ စာသား (ဥပမာ- "MONDAY,WEDNESDAY") ထဲမှာ ပါဝင်လား စစ်တယ်
                                     if (reminder.getRepeatDays().toUpperCase().contains(dayOfWeekName)) {
                                         reminder.setStartDate(nextDate);
                                         foundNextMatch = true;
@@ -70,13 +65,11 @@ public class ReminderSchedulerService {
                                     }
                                 }
 
-                                // ၇ ရက်လုံး ရှာလို့မတွေ့ရင် (ဥပမာ စာသားမှားထည့်ထားရင်) နောက်ထပ်မမြည်အောင် ပိတ်မယ်
                                 if (!foundNextMatch) {
                                     log.warn("No matching day found in repeat days '{}' for reminder ID: {}. Disabling.", reminder.getRepeatDays(), reminder.getId());
                                     reminder.setEnabled(false);
                                 }
                             } else {
-                                // Repeat Days မရှိရင် ပိတ်ပစ်မယ်
                                 reminder.setEnabled(false);
                             }
                             break;
@@ -93,11 +86,18 @@ public class ReminderSchedulerService {
                     }
                 }
 
+                // 🎯 ၂။ 👈 အရေးကြီးဆုံးနေရာ - Noti မပို့ခင် DB ထဲကို အပြောင်းအလဲကို ချက်ချင်း ရိုက်ထည့်လိုက်ပါသည်
+                // ၎င်းကြောင့် အခြား Async Thread သို့မဟုတ် Scheduler က ထပ်မံဆွဲထုတ်၍ မရတော့ပါ။
+                reminderRepository.saveAndFlush(reminder);
+
+                // 🎯 ၃။ DB ထဲတွင် အခြေအနေ ပိတ်/ပြောင်း ပြီးမှသာ Noti ကို စိတ်ချလက်ချ လှမ်းပို့ပါမည်
+                reminderService.triggerReminderAlert(reminder.getId());
+
             } catch (Exception e) {
                 log.error("Error triggering reminder ID: " + reminder.getId(), e);
             }
         }
 
-        reminderRepository.saveAll(pendingReminders);
+        // ကွင်းပိတ်အောက်ခြေက saveAll လိုင်းကို ဖြတ်ပစ်နိုင်ပါပြီ (အပေါ်မှာ တစ်ခုချင်းစီ saveAndFlush လုပ်ခဲ့ပြီးဖြစ်၍)
     }
 }
