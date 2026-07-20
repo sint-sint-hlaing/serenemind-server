@@ -11,7 +11,7 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface AdminDashboardService {
-    DashboardStatsDto getDashboardOverview();
+   // DashboardStatsDto getDashboardOverview();
     Page<UserDto> getAllUsers(Pageable pageable);
     List<MoodDistributionDto> getMoodDistributionData();
     Page<AuditLogDto> getAuditLogs(Pageable pageable);

@@ -1,28 +1,59 @@
 package com.mental.service;
 
-import com.mental.dto.mood.MoodEntryDto;
+import com.mental.dto.mood.WeeklyMoodResponse;
+import com.mental.dto.mood.DailyMoodResponse;
 import com.mental.dto.mood.MoodRequest;
 import com.mental.model.entity.MoodEntry;
-import com.mental.security.UserPrincipal;
 
-import java.security.Principal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-public interface MoodTrackingService{
+public interface MoodTrackingService {
 
 
-    /**MoodEntryDto saveMood(MoodEntryDto mood, UserPrincipal principal);*/
+    void saveMood(
+            String email,
+            MoodRequest request
+    );
 
-   // List<MoodEntryDto> findAllMoods(String name);
 
-    List<MoodEntry> findWeeklyByStatus(String name);
+    Map<String,Double> getMoodSummary(
+            String email
+    );
 
-    List<MoodEntry> findMonthlyStatus(String name);
 
-    void deleteMood(Long id, String name);
+    List<DailyMoodResponse> getMoodHistory(
+            String email,
+            int year,
+            int month
+    );
 
-    void saveMood(String username, MoodRequest request);
 
-    Map<String, Double> getMoodSummary(String username);
+    DailyMoodResponse getMoodByDate(
+            String email,
+            LocalDate date
+    );
+
+
+    List<MoodEntry> findWeeklyByStatus(
+            String email
+    );
+
+
+    List<MoodEntry> findMonthlyStatus(
+            String email
+    );
+
+
+    WeeklyMoodResponse getWeeklyMood(
+            String email
+    );
+
+
+    void deleteMood(
+            Long id,
+            String email
+    );
+
 }

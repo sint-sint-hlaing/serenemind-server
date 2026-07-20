@@ -22,10 +22,11 @@ import java.util.List;
 public class AdminDashboardController {
     private final AdminDashboardService adminService;
 
+    /*
     @GetMapping("/dashboard")
     public ResponseEntity<DashboardStatsDto> getDashboard() {
         return ResponseEntity.ok(adminService.getDashboardOverview());
-    }
+    }*/
 
     @GetMapping("/users")
     public ResponseEntity<Page<UserDto>> getAllUsers(Pageable pageable) {

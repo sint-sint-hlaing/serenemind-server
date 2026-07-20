@@ -1,63 +1,211 @@
 package com.mental.controller;
 
-import com.mental.dto.mood.MoodEntryDto;
+
+import com.mental.dto.mood.DailyMoodResponse;
 import com.mental.dto.mood.MoodRequest;
-import com.mental.model.entity.MoodEntry;
+import com.mental.dto.mood.WeeklyMoodResponse;
 import com.mental.security.UserPrincipal;
 import com.mental.service.MoodTrackingService;
+
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+
 import org.springframework.web.bind.annotation.*;
 
-import java.security.Principal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
-import static org.springframework.http.ResponseEntity.ok;
 
 @RestController
 @RequestMapping("/api/mood")
 @RequiredArgsConstructor
 public class MoodTrackingApi {
-     private final MoodTrackingService moodTrackingService;
+
+
+    private final MoodTrackingService moodTrackingService;
+
+
+
+    // Save Mood
+    // POST /api/moods/save
 
     @PostMapping("/save")
-    public ResponseEntity<String> saveMood(@RequestBody MoodRequest request, Principal principal) {
-        moodTrackingService.saveMood(principal.getName(), request);
-        return ok("Mood saved successfully");
-    }
+    public ResponseEntity<Void> saveMood(
 
-     /**
-        @PostMapping("/save")
-        public ResponseEntity<MoodEntryDto> addMoodEntry(@RequestBody MoodEntryDto mood, @AuthenticationPrincipal UserPrincipal principal) {
-            return ResponseEntity.ok(moodTrackingService.saveMood(mood,principal));
-        }**/
+            @AuthenticationPrincipal UserPrincipal principal,
 
-     @GetMapping("/summary")
-     public ResponseEntity<Map<String, Double>> getAllMoodHistory(@AuthenticationPrincipal UserPrincipal principal) {
-         // 1. Get the map from the service
-         Map<String, Double> summary = moodTrackingService.getMoodSummary(principal.getUsername());
+            @RequestBody MoodRequest request
 
-         // 2. Wrap it in ResponseEntity.ok()
-         return ResponseEntity.ok(summary);
-     }
-        @GetMapping("/weekly")
-        public ResponseEntity<List<MoodEntry>> getWeeklyByStatus(@AuthenticationPrincipal UserPrincipal principal) {
-            return ok(moodTrackingService.findWeeklyByStatus(principal.getEmail()));
-    }
+    ){
 
-        @GetMapping("/monthly")
-        public ResponseEntity<List<MoodEntry>> getMonthlyByStatus(@AuthenticationPrincipal UserPrincipal principal) {
-            return ok(moodTrackingService.findMonthlyStatus(principal.getEmail()));
+        moodTrackingService.saveMood(
+                principal.getEmail(),
+                request
+        );
 
-    }
 
-        @DeleteMapping("/{id}")
-        public ResponseEntity<Void> deleteMood(@PathVariable Long id,@AuthenticationPrincipal UserPrincipal principal) {
-            moodTrackingService.deleteMood(id, principal.getEmail());
-            return ResponseEntity.noContent().build(); // 204 No Content
-        }
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .build();
     }
 
 
+
+    // Overall Summary
+    // GET /api/moods/summary
+
+    @GetMapping("/summary")
+    public ResponseEntity<Map<String,Double>> getMoodSummary(
+
+            @AuthenticationPrincipal UserPrincipal principal
+
+    ){
+
+        return ResponseEntity.ok(
+                moodTrackingService.getMoodSummary(
+                        principal.getEmail()
+                )
+        );
+    }
+
+
+
+    // Calendar History
+    // GET /api/moods/history?year=2024&month=5
+
+    @GetMapping("/history")
+    public ResponseEntity<List<DailyMoodResponse>> getMonthlyHistory(
+
+            @AuthenticationPrincipal UserPrincipal principal,
+
+            @RequestParam int year,
+
+            @RequestParam int month
+
+    ){
+
+        return ResponseEntity.ok(
+                moodTrackingService.getMoodHistory(
+                        principal.getEmail(),
+                        year,
+                        month
+                )
+        );
+    }
+
+
+
+
+    // Single Date
+    // GET /api/moods/date/2024-05-12
+
+    @GetMapping("/date/{date}")
+    public ResponseEntity<DailyMoodResponse> getMoodByDate(
+
+            @AuthenticationPrincipal UserPrincipal principal,
+
+            @PathVariable LocalDate date
+
+    ){
+
+        return ResponseEntity.ok(
+                moodTrackingService.getMoodByDate(
+                        principal.getEmail(),
+                        date
+                )
+        );
+    }
+
+
+
+
+    // Weekly Records
+
+    @GetMapping("/weekly")
+    public ResponseEntity<?> getWeeklyMood(
+
+            @AuthenticationPrincipal UserPrincipal principal
+
+    ){
+
+        return ResponseEntity.ok(
+                moodTrackingService.findWeeklyByStatus(
+                        principal.getEmail()
+                )
+        );
+    }
+
+
+
+
+
+    // Monthly Records
+
+    @GetMapping("/monthly")
+    public ResponseEntity<?> getMonthlyMood(
+
+            @AuthenticationPrincipal UserPrincipal principal
+
+    ){
+
+        return ResponseEntity.ok(
+                moodTrackingService.findMonthlyStatus(
+                        principal.getEmail()
+                )
+        );
+    }
+
+
+
+
+
+    // Weekly Chart
+    // GET /api/moods/summary/week
+
+    @GetMapping("/summary/week")
+    public ResponseEntity<WeeklyMoodResponse> getWeeklySummary(
+
+            @AuthenticationPrincipal UserPrincipal principal
+
+    ){
+
+        return ResponseEntity.ok(
+                moodTrackingService.getWeeklyMood(
+                        principal.getEmail()
+                )
+        );
+    }
+
+
+
+
+
+    // Delete
+
+    // DELETE /api/moods/delete/1
+
+    @DeleteMapping("/delete/{id}")
+    public ResponseEntity<Void> deleteMood(
+
+            @PathVariable Long id,
+
+            @AuthenticationPrincipal UserPrincipal principal
+
+    ){
+
+        moodTrackingService.deleteMood(
+                id,
+                principal.getEmail()
+        );
+
+
+        return ResponseEntity.noContent().build();
+    }
+
+
+}
