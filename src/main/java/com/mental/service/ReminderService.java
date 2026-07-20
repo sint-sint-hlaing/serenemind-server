@@ -13,6 +13,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -27,7 +29,10 @@ public class ReminderService {
 
     @Transactional(readOnly = true)
     public List<ReminderResponse> getRemindersByUserId(UserPrincipal userPrincipal) {
-        return reminderRepository.findByUserIdSorted(userPrincipal.getId())
+        LocalDate today = LocalDate.now();
+        LocalTime nowTime = LocalTime.now().truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+
+        return reminderRepository.findByUserIdSorted(userPrincipal.getId(), today, nowTime)
                 .stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
@@ -35,13 +40,62 @@ public class ReminderService {
 
     @Transactional
     public ReminderResponse createReminder(UserPrincipal userPrincipal, ReminderRequest request) {
+
+        LocalDate finalStartDate = request.getStartDate();
+        LocalTime nowTime = LocalTime.now();
+        LocalDate today = LocalDate.now();
+
+        // 💡 အကယ်၍ သတ်မှတ်ထားသောရက်က ဒီနေ့ဖြစ်ပြီး၊ အချိန်က လက်ရှိအချိန်ထက် ကျော်လွန်နေခဲ့လျှင်
+        if (finalStartDate.equals(today) && request.getReminderTime().isBefore(nowTime)) {
+            String repeatType = request.getRepeatType() != null ? request.getRepeatType().toUpperCase() : "ONCE";
+
+            switch (repeatType) {
+                case "ONCE":
+                case "DAILY":
+                    // ONCE ကော DAILY ကော အချိန်ကျော်လျှင် မနက်ဖြန် (Tomorrow) သို့ ရွှေ့မည်
+                    finalStartDate = today.plusDays(1);
+                    break;
+
+                case "WEEKLY":
+                    finalStartDate = today.plusWeeks(1);
+                    break;
+
+                case "MONTHLY":
+                    finalStartDate = today.plusMonths(1);
+                    break;
+
+                case "CUSTOM_DAYS":
+                    if (request.getRepeatDays() != null && !request.getRepeatDays().isEmpty()) {
+                        LocalDate nextDate = today;
+                        boolean foundNextMatch = false;
+
+                        for (int i = 1; i <= 7; i++) {
+                            nextDate = nextDate.plusDays(1);
+                            String dayOfWeekName = nextDate.getDayOfWeek().name();
+
+                            if (request.getRepeatDays().toUpperCase().contains(dayOfWeekName)) {
+                                finalStartDate = nextDate;
+                                foundNextMatch = true;
+                                break;
+                            }
+                        }
+                        if (!foundNextMatch) {
+                            finalStartDate = today.plusDays(1);
+                        }
+                    } else {
+                        finalStartDate = today.plusDays(1);
+                    }
+                    break;
+            }
+        }
+
         Reminder reminder = Reminder.builder()
                 .userId(userPrincipal.getId())
                 .title(request.getTitle())
                 .repeatType(request.getRepeatType())
-                .repeatDays(request.getRepeatDays()) // 👈 ၁။ ရက်အလိုက် သိမ်းဆည်းနိုင်ရန် ဤနေရာတွင် ထည့်ပါ
+                .repeatDays(request.getRepeatDays())
                 .reminderTime(request.getReminderTime())
-                .startDate(request.getStartDate())
+                .startDate(finalStartDate) // 👈 တွက်ချက်ပြီးသား ရက်စွဲအသစ်ကို ထည့်သွင်းမည်
                 .reminderTone(request.getReminderTone())
                 .note(request.getNote())
                 .enabled(request.isEnabled())
@@ -68,24 +122,25 @@ public class ReminderService {
         reminderRepository.delete(reminder);
     }
 
-    @Async
-    @Transactional
-    public void triggerReminderAlert(Long reminderId) {
-        Reminder reminder = reminderRepository.findById(reminderId)
-                .orElseThrow(() -> new ResourceNotFoundException("Reminder not found with id: " + reminderId));
+//    @Async
+// @Async <-- ❌ Noti ၂ စောင်ပွားခြင်းမှ ကာကွယ်ရန် ဤလိုင်းကို လုံးဝ ဖြတ်ပစ်ပါ
+@Transactional
+public void triggerReminderAlert(Long reminderId) {
+    Reminder reminder = reminderRepository.findById(reminderId)
+            .orElseThrow(() -> new ResourceNotFoundException("Reminder not found with id: " + reminderId));
 
-        User user = userRepository.findById(reminder.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + reminder.getUserId()));
+    User user = userRepository.findById(reminder.getUserId())
+            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + reminder.getUserId()));
 
-        String title = "Reminder Alert";
-        String message = "It's time for your reminder: \"" + reminder.getTitle() + "\"";
+    String title = "Reminder Alert";
+    String message = "It's time for your reminder: \"" + reminder.getTitle() + "\"";
 
-        // ၁။ Database ထဲ Noti Record ဝင်အောင် ဆောက်ပါသည် (ဒီကောင်ကိုပဲ ချန်ထားပါ)
-        notificationService.createNotification(user, title, message, "REMINDER", reminder.getId(), "REMINDER");
+    // DB ထဲ Notification Record ထည့်ခြင်း
+    notificationService.createNotification(user, title, message, "REMINDER", reminder.getId(), "REMINDER");
 
-        // ❌ ၂။ 👈 ဤလိုင်းကို လုံးဝ ဖြတ်ပစ်ပါ သို့မဟုတ် Comment ပိတ်ပါ (ဒါမှ Noti ၂ စောင် မပွားတော့မှာပါ)
-        // fcmPushService.sendPushNotificationToUser(user, title, message, reminder.getId(), "REMINDER");
-    }
+    // FCM Push Notification ပါ တစ်ပါတည်း တိုက်ရိုက်ပို့ခြင်း (အပေါ်က @Async ဖြုတ်ထား၍ ဤနေရာတွင် စိတ်ချလက်ချ ခေါ်နိုင်ပါပြီ)
+//    fcmPushService.sendPushNotificationToUser(user, title, message, reminder.getId(), "REMINDER");
+}
 
     // Helper method to convert Entity to Response DTO
     private ReminderResponse convertToResponse(Reminder reminder) {

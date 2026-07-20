@@ -1,15 +1,22 @@
 package com.mental.service;
 
 import com.mental.model.entity.Reminder;
+import com.mental.model.entity.User;
 import com.mental.repository.ReminderRepository;
+import com.mental.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Service
@@ -18,17 +25,23 @@ import java.util.List;
 public class ReminderSchedulerService {
 
     private final ReminderRepository reminderRepository;
-    private final ReminderService reminderService;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService; // 💡 Noti ပွားခြင်းမှ ကာကွယ်ရန် ဤနေရာတွင် NotificationService ကို သုံးပါမည်
 
-    @Scheduled(fixedRate = 60000)
-    @Transactional // 👈 Transaction စတင်သည်
+    @Autowired
+    @Lazy
+    private ReminderSchedulerService self;
+
+    // 💡 00 စက္ကန့်ရောက်တိုင်း ၁ မိနစ်တစ်ကြိမ် တိတိကျကျ အလုပ်လုပ်ရန် Cron စနစ်သို့ ပြောင်းလဲထားပါသည်
+    @Scheduled(cron = "0 * * * * *")
     public void checkPendingReminders() {
-        LocalDateTime now = LocalDateTime.now();
+        // စက္ကန့်နှင့် မီလီစက္ကန့်ကို 00 အဖြစ် ဖြတ်ချလိုက်ခြင်းဖြင့် အချိန်ကွက်တိ ကိုက်ညီစေပါသည်
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.MINUTES);
+        LocalDate today = now.toLocalDate();
+        LocalTime nowTime = now.toLocalTime();
 
-        List<Reminder> pendingReminders = reminderRepository.findPendingReminders(
-                now.toLocalDate(),
-                now.toLocalTime()
-        );
+        // ရောက်ရှိနေသော Pending Reminder များကို ဆွဲထုတ်ခြင်း (Repository Query က `=` စနစ် ဖြစ်ရပါမည်)
+        List<Reminder> pendingReminders = reminderRepository.findPendingReminders(today, nowTime);
 
         log.info("Checking reminders at {}. Found {} pending reminders.", now, pendingReminders.size());
 
@@ -38,66 +51,88 @@ public class ReminderSchedulerService {
 
         for (Reminder reminder : pendingReminders) {
             try {
-                // 🎯 ၁။ ၎င်း Reminder အတွက် Repeat Type အလိုက် ရက်စွဲ/အခြေအနေကို ချက်ချင်း အရင်ပြင်ဆင်ပါမည်
-                String repeatType = reminder.getRepeatType();
+                // ၁။ Status/ရက်စွဲကို အရင် Update လုပ်ပြီး သီးသန့် Transaction ဖြင့် Commit အရင်ချမည်
+                self.updateReminderStatusInNewTransaction(reminder.getId());
 
-                if (repeatType == null || "ONCE".equalsIgnoreCase(repeatType)) {
-                    reminder.setEnabled(false);
-                } else {
-                    switch (repeatType.toUpperCase()) {
-                        case "DAILY":
-                            reminder.setStartDate(reminder.getStartDate().plusDays(1));
-                            break;
+                // ၂။ သုံးစွဲသူကို ရှာဖွေပြီး Noti ပို့မည်
+                User user = userRepository.findById(reminder.getUserId()).orElse(null);
 
-                        case "CUSTOM_DAYS":
-                            if (reminder.getRepeatDays() != null && !reminder.getRepeatDays().isEmpty()) {
-                                LocalDate nextDate = reminder.getStartDate();
-                                boolean foundNextMatch = false;
-
-                                for (int i = 1; i <= 7; i++) {
-                                    nextDate = nextDate.plusDays(1);
-                                    String dayOfWeekName = nextDate.getDayOfWeek().name();
-
-                                    if (reminder.getRepeatDays().toUpperCase().contains(dayOfWeekName)) {
-                                        reminder.setStartDate(nextDate);
-                                        foundNextMatch = true;
-                                        break;
-                                    }
-                                }
-
-                                if (!foundNextMatch) {
-                                    log.warn("No matching day found in repeat days '{}' for reminder ID: {}. Disabling.", reminder.getRepeatDays(), reminder.getId());
-                                    reminder.setEnabled(false);
-                                }
-                            } else {
-                                reminder.setEnabled(false);
-                            }
-                            break;
-
-                        case "WEEKLY":
-                            reminder.setStartDate(reminder.getStartDate().plusWeeks(1));
-                            break;
-                        case "MONTHLY":
-                            reminder.setStartDate(reminder.getStartDate().plusMonths(1));
-                            break;
-                        default:
-                            reminder.setEnabled(false);
-                            break;
-                    }
+                if (user != null) {
+                    // 💡 NotificationService မှတစ်ဆင့် ခေါ်ယူသဖြင့် DB ထဲ Noti ဝင်ပြီး FCM ပါ တစ်ကြိမ်တည်း ကွက်တိ ပို့ပေးသွားမည် ဖြစ်သည်
+                    notificationService.createNotification(
+                            user,
+                            "Reminder: " + reminder.getTitle(),
+                            "Time to: " + (reminder.getNote() != null ? reminder.getNote() : reminder.getTitle()),
+                            "REMINDER",
+                            reminder.getId(),
+                            "REMINDER"
+                    );
                 }
-
-                // 🎯 ၂။ 👈 အရေးကြီးဆုံးနေရာ - Noti မပို့ခင် DB ထဲကို အပြောင်းအလဲကို ချက်ချင်း ရိုက်ထည့်လိုက်ပါသည်
-                // ၎င်းကြောင့် အခြား Async Thread သို့မဟုတ် Scheduler က ထပ်မံဆွဲထုတ်၍ မရတော့ပါ။
-                reminderRepository.saveAndFlush(reminder);
-
-                // 🎯 ၃။ DB ထဲတွင် အခြေအနေ ပိတ်/ပြောင်း ပြီးမှသာ Noti ကို စိတ်ချလက်ချ လှမ်းပို့ပါမည်
-                reminderService.triggerReminderAlert(reminder.getId());
 
             } catch (Exception e) {
                 log.error("Error triggering reminder ID: " + reminder.getId(), e);
             }
         }
+    }
 
-        // ကွင်းပိတ်အောက်ခြေက saveAll လိုင်းကို ဖြတ်ပစ်နိုင်ပါပြီ (အပေါ်မှာ တစ်ခုချင်းစီ saveAndFlush လုပ်ခဲ့ပြီးဖြစ်၍)
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void updateReminderStatusInNewTransaction(Long reminderId) {
+        Reminder reminder = reminderRepository.findById(reminderId)
+                .orElseThrow(() -> new IllegalArgumentException("Reminder not found: " + reminderId));
+
+        String repeatType = reminder.getRepeatType();
+        LocalDate today = LocalDate.now();
+
+        if (repeatType == null || "ONCE".equalsIgnoreCase(repeatType)) {
+            // ONCE သမားဖြစ်လျှင် Noti တက်ပြီးပါက အလိုအလျောက် ပိတ်ပစ်မည်
+            reminder.setEnabled(false);
+        } else {
+            switch (repeatType.toUpperCase()) {
+                case "DAILY":
+                    LocalDate baseDailyDate = reminder.getStartDate().isBefore(today) ? today : reminder.getStartDate();
+                    reminder.setStartDate(baseDailyDate.plusDays(1));
+                    break;
+
+                case "CUSTOM_DAYS":
+                    if (reminder.getRepeatDays() != null && !reminder.getRepeatDays().isEmpty()) {
+                        LocalDate nextDate = today;
+                        boolean foundNextMatch = false;
+
+                        for (int i = 1; i <= 7; i++) {
+                            nextDate = nextDate.plusDays(1);
+                            String dayOfWeekName = nextDate.getDayOfWeek().name();
+
+                            if (reminder.getRepeatDays().toUpperCase().contains(dayOfWeekName)) {
+                                reminder.setStartDate(nextDate);
+                                foundNextMatch = true;
+                                break;
+                            }
+                        }
+
+                        if (!foundNextMatch) {
+                            reminder.setEnabled(false);
+                        }
+                    } else {
+                        reminder.setEnabled(false);
+                    }
+                    break;
+
+                case "WEEKLY":
+                    LocalDate baseWeeklyDate = reminder.getStartDate().isBefore(today) ? today : reminder.getStartDate();
+                    reminder.setStartDate(baseWeeklyDate.plusWeeks(1));
+                    break;
+
+                case "MONTHLY":
+                    LocalDate baseMonthlyDate = reminder.getStartDate().isBefore(today) ? today : reminder.getStartDate();
+                    reminder.setStartDate(baseMonthlyDate.plusMonths(1));
+                    break;
+
+                default:
+                    reminder.setEnabled(false);
+                    break;
+            }
+        }
+
+        reminderRepository.saveAndFlush(reminder);
     }
 }
