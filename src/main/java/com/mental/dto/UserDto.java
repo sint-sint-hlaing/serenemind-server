@@ -1,5 +1,6 @@
 package com.mental.dto;
 
+import com.mental.model.entity.UserProfile;
 import io.jsonwebtoken.ClaimsMutator;
 import lombok.Builder;
 
@@ -21,6 +22,7 @@ public record UserDto(
         boolean isActive,
         LocalDateTime createdAt
 ) {
+
 
 
 }

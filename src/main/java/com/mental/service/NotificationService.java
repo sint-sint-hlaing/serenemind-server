@@ -8,6 +8,10 @@ import com.mental.repository.NotificationRepository;
 import com.mental.repository.UserRepository;
 import com.mental.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -121,7 +125,7 @@ public class NotificationService {
         response.setType(notification.getType());
         response.setRead(notification.isRead());
         if (notification.getCreatedAt() != null) {
-            response.setCreatedAt(LocalDateTime.ofInstant(notification.getCreatedAt(), ZoneId.systemDefault()));
+            response.setCreatedAt(notification.getCreatedAt());
         }
 
         // 👈 Target Data များ ထည့်ပေးရန်
@@ -129,5 +133,15 @@ public class NotificationService {
         response.setTargetType(notification.getTargetType());
 
         return response;
+    }
+
+    public long getUnreadCount(Long id) {
+        return notificationRepository.countByUserIdAndIsReadFalse(id);
+    }
+
+    public Page<NotificationResponse> getUnreadNotifications(UserPrincipal user, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
+        Page<Notification> notificationPage= notificationRepository.findByUserIdAndIsReadFalse(user.getId(),pageable);
+        return notificationPage.map(this::convertToNotificationResponse);
     }
 }

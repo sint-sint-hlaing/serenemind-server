@@ -1,9 +1,11 @@
 package com.mental.service;
 
-import com.mental.dto.mood.WeeklyMoodResponse;
 import com.mental.dto.mood.DailyMoodResponse;
+import com.mental.dto.mood.MoodDistributionDto;
 import com.mental.dto.mood.MoodRequest;
+import com.mental.dto.mood.WeeklyMoodResponse;
 import com.mental.model.entity.MoodEntry;
+import com.mental.model.entity.enums.MoodType;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -11,49 +13,43 @@ import java.util.Map;
 
 public interface MoodTrackingService {
 
+    // ===== Save =====
+    void saveMood(String email, MoodRequest request);
 
-    void saveMood(
-            String email,
-            MoodRequest request
-    );
+    // ===== Summary =====
+    Map<String, Double> getMoodSummary(String email);
 
+    // ===== History =====
+    List<DailyMoodResponse> getMoodHistory(String email, int year, int month);
 
-    Map<String,Double> getMoodSummary(
-            String email
-    );
+    // ===== By Date =====
+    DailyMoodResponse getMoodByDate(String email, LocalDate date);
 
+    // ===== Weekly =====
+    List<WeeklyMoodResponse> getWeeklyMood(String email);
 
-    List<DailyMoodResponse> getMoodHistory(
-            String email,
-            int year,
-            int month
-    );
+    // ===== Monthly =====
+    List<DailyMoodResponse> getMonthlyMood(String email);
 
+    // ===== Weekly Summary =====
+    WeeklyMoodResponse getWeeklySummary(String email);
 
-    DailyMoodResponse getMoodByDate(
-            String email,
-            LocalDate date
-    );
+    // ===== Delete =====
+    void deleteMood(Long id, String email);
 
+    // ===== Distribution =====
+    List<MoodDistributionDto> getMoodDistribution();
 
-    List<MoodEntry> findWeeklyByStatus(
-            String email
-    );
+    // ===== Analysis =====
+    List<MoodDistributionDto> getMoodAnalysis(int days);
 
-
-    List<MoodEntry> findMonthlyStatus(
-            String email
-    );
+    // ===== Counts =====
 
 
-    WeeklyMoodResponse getWeeklyMood(
-            String email
-    );
+    // ===== Deprecated =====
+    @Deprecated
+    List<MoodEntry> findWeeklyByStatus(String email);
 
-
-    void deleteMood(
-            Long id,
-            String email
-    );
-
+    @Deprecated
+    List<MoodEntry> findMonthlyStatus(String email);
 }

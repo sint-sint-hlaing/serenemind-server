@@ -1,9 +1,6 @@
 package com.mental.model.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -20,4 +17,6 @@ public class UserStreak extends BaseEntity {
 
     private int streakCount;
     private LocalDate lastCompleted;
+    @Column(name = "longest_streak")
+    private int longestStreak = 0;
 }

@@ -2,10 +2,7 @@ package com.mental.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mental.dto.JournalAnalysisResponse;
-import com.mental.dto.JournalPhotoResponse;
-import com.mental.dto.JournalRequest;
-import com.mental.dto.JournalResponse;
+import com.mental.dto.*;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.model.entity.Journal;
 import com.mental.model.entity.JournalAnalysis;
@@ -504,8 +501,8 @@ public class JournalService {
         response.setFavourite(journal.isFavourite());
         response.setPrivate(journal.isPrivate());
         response.setPhotoUrl(journal.getPhotoUrl());
-        response.setCreatedAt(journal.getCreatedAt());
-        response.setUpdatedAt(journal.getUpdatedAt());
+        //response.setCreatedAt(journal.getCreatedAt());
+       // response.setUpdatedAt(journal.getUpdatedAt());
 
         // Attach inline analysis only if it already exists (no eager AI calls)
         if (journal.getAnalysis() != null) {
@@ -525,7 +522,7 @@ public class JournalService {
         r.setKeyThemes(stringToTags(analysis.getKeyThemes()));
         r.setAiResponse(analysis.getAiResponse());
         r.setAiSuggestion(analysis.getAiSuggestion());
-        r.setAnalysedAt(analysis.getUpdatedAt());
+       // r.setAnalysedAt(analysis.getUpdatedAt());
         return r;
     }
 
@@ -609,4 +606,6 @@ public class JournalService {
                               "Consider a short meditation tonight to improve your sleep.";
         };
     }
+
+
 }

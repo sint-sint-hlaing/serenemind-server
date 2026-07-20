@@ -17,4 +17,14 @@ public interface AdminDashboardService {
     Page<AuditLogDto> getAuditLogs(Pageable pageable);
     Page<JournalDto> getFlaggedJournals(Pageable pageable);
     void resolveFlaggedJournal(Long journalId);
+
+    DashboardStatsDto getMonthlyRate();
+
+ DashboardStatsDto getMeditationsCount();
+
+ DashboardStatsDto getJournalsCount();
+
+ DashboardStatsDto getMoodsCount();
+
+ Page<UserDto> getActiveUsers(Pageable pageable);
 }

@@ -1,6 +1,9 @@
 package com.mental.repository;
 
+import com.mental.dto.UserDto;
 import com.mental.model.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -21,4 +24,7 @@ public interface UserRepository
 
     Optional<User> findByUsername(String username);
 
+    Page<User>findByIsActiveTrue(Pageable pageable);
+
+    long countByCreatedAtBetween(LocalDateTime localDateTime, LocalDateTime now);
 }

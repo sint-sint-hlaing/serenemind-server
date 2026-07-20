@@ -23,7 +23,7 @@ public class AuthService {
 
     private final RefreshTokenService refreshTokenService;
 
-
+/*
     public AuthResponse register(RegisterRequest req) {
 
         User user = new User();
@@ -45,7 +45,32 @@ public class AuthService {
         String refresh = refreshTokenService.createToken(user);
 
         return new AuthResponse(access, refresh);
-    }
+    }*/
+public AuthResponse register(RegisterRequest req) {
+
+    User user = new User();
+    user.setUsername(req.username());
+    user.setEmail(req.email());
+    user.setPasswordHash(encoder.encode(req.password()));
+    user.setRole(Role.USER);
+    user.setActive(true); // လိုအပ်ပါက true ပေးရန်
+
+    // 🔴 UserProfile ကို တည်ဆောက်ပြီး Request မှ Data များ ထည့်ခြင်း
+    UserProfile profile = new UserProfile();
+    profile.setUser(user);
+    //profile.setAvatar("avatar-1");
+   // profile.setFullname(req.fullname()); // 👈 Request ထဲက fullname ကို ထည့်ခြင်း
+    //profile.setBirthday(req.birthday()); // 👈 Request ထဲက birthday ကို ထည့်ခြင်း
+
+    user.setProfile(profile); // User ထဲသို့ Profile ထည့်သွင်းခြင်း
+
+    users.save(user); // CascadeType.ALL ကြောင့် UserProfile ပါ အလိုအလျောက် Database ထဲ ဝင်သွားပါမည်
+
+    String access = jwtService.generate(user);
+    String refresh = refreshTokenService.createToken(user);
+
+    return new AuthResponse(access, refresh);
+}
 
     public AuthResponse login(LoginRequest req) {
 
@@ -129,4 +154,26 @@ public class AuthService {
 
     }
 
+    public AuthResponse registerAdmin(RegisterRequest req) {
+        User user = new User();
+
+        user.setUsername(req.username());
+        user.setEmail(req.email());
+        user.setPasswordHash(encoder.encode(req.password()));
+
+        // 🔴 ဤနေရာတွင် Role ကို ADMIN ဟု သတ်မှတ်ပေးပါ
+        user.setRole(Role.ADMIN);
+
+        UserProfile profile = new UserProfile();
+        profile.setUser(user);
+       // profile.setAvatar("avatar-1");
+        user.setProfile(profile);
+
+        users.save(user);
+
+        String access = jwtService.generate(user);
+        String refresh = refreshTokenService.createToken(user);
+
+        return new AuthResponse(access, refresh);
+    }
 }

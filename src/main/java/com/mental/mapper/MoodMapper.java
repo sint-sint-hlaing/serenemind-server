@@ -1,31 +1,59 @@
 package com.mental.mapper;
 
-import com.mental.dto.mood.MoodEntryDto;
+import com.mental.dto.mood.DailyMoodResponse;
+import com.mental.dto.mood.MoodRequest;
+import com.mental.dto.mood.WeeklyMoodResponse;
 import com.mental.model.entity.MoodEntry;
-import com.mental.model.entity.enums.MoodType;
+import com.mental.model.entity.User;
 import org.springframework.stereotype.Component;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Component
 public class MoodMapper {
 
-    public MoodEntryDto toDto(MoodEntry entry) {
-        MoodEntryDto dto = new MoodEntryDto();
-        dto.setMoodType(entry.getMood().name());
-        dto.setIntensity(entry.getIntensity());
-        dto.setNote(entry.getNote());
-        if (entry.getAnalysis() != null) {
-            dto.setEmotion(entry.getAnalysis().getEmotion());
-            dto.setStressLevel(entry.getAnalysis().getStressLevel());
-            dto.setRecommendation(entry.getAnalysis().getRecommendation());
+    public MoodEntry toEntity(MoodRequest request, User user) {
+        if (request == null) {
+            return null;
         }
-        return dto;
+
+        return MoodEntry.builder()
+                .user(user)
+                .mood(request.mood())
+                .intensity(request.intensity())
+                .score(request.score() != null ? request.score() : 0)
+                .note(request.note())
+                .date(LocalDate.now())
+                .build();
+        // createdAt နှင့် updatedAt ကို BaseEntity က @CreationTimestamp နှင့် @UpdateTimestamp ဖြင့် auto handle လုပ်ပေးမည်
     }
 
-    public MoodEntry toEntity(MoodEntryDto dto) {
-        MoodEntry entry = new MoodEntry();
-        entry.setMood(MoodType.valueOf(dto.getMoodType()));
-        entry.setIntensity(dto.getIntensity());
-        entry.setNote(dto.getNote());
-        return entry;
+    public DailyMoodResponse toDailyResponse(MoodEntry entry) {
+        if (entry == null) {
+            return null;
+        }
+
+        return DailyMoodResponse.builder()
+                .date(entry.getDate())
+                .mood(entry.getMood())
+                .intensity(entry.getIntensity())
+                .score(entry.getScore())
+                .note(entry.getNote())
+                .build();
+    }
+
+    public WeeklyMoodResponse toWeeklyResponse(MoodEntry entry) {
+        if (entry == null) {
+            return null;
+        }
+
+        return WeeklyMoodResponse.builder()
+                .mood(entry.getMood())
+                .intensity(entry.getIntensity())
+                .totalEntries(1)
+                .startDate(entry.getDate())
+                .endDate(entry.getDate())
+                .build();
     }
 }

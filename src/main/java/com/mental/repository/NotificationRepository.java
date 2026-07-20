@@ -2,6 +2,8 @@ package com.mental.repository;
 
 import com.mental.model.entity.Notification;
 import com.mental.model.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,6 +14,10 @@ import java.util.Optional;
 public interface NotificationRepository extends JpaRepository<Notification,Long> {
     List<Notification> findByUserUsernameOrderByCreatedAtDesc(String username);
 
+    long countByUserIdAndIsReadFalse(Long id);
+    Page<Notification> findByUserIdAndIsReadFalse(Long id, Pageable pageable);
+
+   // List<Notification> findByUerIdAndIsReadFalse(Long id);
     // User အလိုက် Notification အားလုံးကို အချိန်အသစ်ဆုံးကနေ စီထုတ်ရန် (All Tab အတွက်)
         List<Notification> findByUserOrderByCreatedAtDesc(User user);
 

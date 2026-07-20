@@ -1,11 +1,11 @@
 package com.mental.controller;
 
 import com.mental.dto.Notification.NotificationResponse;
-import com.mental.dto.NotificationDto;
-import com.mental.model.entity.Notification;
+import com.mental.model.entity.User;
 import com.mental.security.UserPrincipal;
 import com.mental.service.NotificationService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -46,6 +46,24 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/unread/count")
+    public ResponseEntity<Long> getUnreadCount(@AuthenticationPrincipal UserPrincipal user){
+        long userId=user.getId();
+        long count= notificationService.getUnreadCount(user.getId());
+        return ResponseEntity.ok(count);
+    }
+
+    @GetMapping("/unread")
+    public ResponseEntity<Page<NotificationResponse>> getUnreadNotifications(
+            @AuthenticationPrincipal UserPrincipal user,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size
+    ){
+        Page<NotificationResponse> notifications= notificationService.getUnreadNotifications(user, page, size);
+        return ResponseEntity.ok(notifications);
+    }
+
+
 //    // UI/Testing - Notification အသစ် ဆောက်ရန် (Create Notification)
 //    @PostMapping
 //    public ResponseEntity<NotificationResponse> createNotification(
@@ -64,4 +82,5 @@ public class NotificationController {
         NotificationResponse response = notificationService.clickAndGetNotification(id, userPrincipal);
         return ResponseEntity.ok(response);
     }
+
 }

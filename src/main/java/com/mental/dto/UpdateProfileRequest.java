@@ -12,6 +12,5 @@ public class UpdateProfileRequest {
     @NotBlank(message = "Full name cannot be empty")
     private String fullname;
 
-    private String avatar;
     private LocalDate birthday;
 }

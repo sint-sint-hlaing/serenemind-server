@@ -149,7 +149,7 @@ public class PostService {
             response.setUserProfilePicture(null);
         } else {
             String profilePic = (post.getUser().getUserProfile() != null)
-                    ? post.getUser().getUserProfile().getAvatar()
+                    ? post.getUser().getUserProfile().getProfileImageUrl()
                     : null;
             response.setUsername(post.getUser().getUsername());
             response.setUserProfilePicture(profilePic);

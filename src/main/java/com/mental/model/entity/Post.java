@@ -25,6 +25,9 @@ public class Post {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    private Avatar avatar;
+
     private int likeCount = 0;
     private int commentCount = 0;
 

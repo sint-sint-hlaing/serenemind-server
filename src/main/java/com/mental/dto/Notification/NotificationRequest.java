@@ -16,4 +16,7 @@ public class NotificationRequest {
 
     @NotBlank(message = "Type is required")
     private String type; // LIKE, COMMENT, REMINDER, SYSTEM, GOAL
+
+    String target;
+    Long userId;
 }

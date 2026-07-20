@@ -2,7 +2,9 @@ package com.mental.controller;
 
 import com.mental.dto.*;
 import com.mental.service.AuthService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 import org.springframework.web.bind.annotation.*;
@@ -29,13 +31,15 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public AuthResponse register(
-            @RequestBody RegisterRequest req) {
-
-        return authService.register(req);
-
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest req) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(authService.register(req));
     }
 
+    @PostMapping("/admin/register")
+    public AuthResponse registerAdmin(@RequestBody RegisterRequest req) {
+        return authService.registerAdmin(req);
+    }
 
     @PostMapping("/login")
     public AuthResponse login(
@@ -57,18 +61,9 @@ public class AuthController {
 
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(
-            @RequestBody LogoutRequest request
-    ) {
-
-
+    public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
-
-
-        return ResponseEntity.ok(
-                "Logout success"
-        );
-
+        return ResponseEntity.noContent().build();
     }
 
 
