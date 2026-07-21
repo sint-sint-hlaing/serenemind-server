@@ -43,7 +43,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public AuthResponse login(
-            @RequestBody LoginRequest req) {
+            @RequestBody @Valid LoginRequest req) {
 
         return authService.login(req);
 

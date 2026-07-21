@@ -27,6 +27,7 @@ public class NotificationService {
 
     private final NotificationRepository notificationRepository;
     private final UserRepository userRepository;
+    private final FcmPushService fcmPushService;
 
     // UI - Filter အလိုက် Notification List ဆွဲထုတ်ခြင်း
     @Transactional(readOnly = true)
@@ -97,6 +98,8 @@ public class NotificationService {
         noti.setTargetType(targetType);
 
         notificationRepository.save(noti);
+
+        fcmPushService.sendPushNotificationToUser(recipient, title, message, targetId, targetType);
     }
 
     // Noti ကို နှိပ်လိုက်လျှင် Read true လုပ်ပြီး Target အချက်အလက် ပြန်ပေးမည်

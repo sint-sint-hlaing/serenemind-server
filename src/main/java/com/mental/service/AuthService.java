@@ -19,6 +19,8 @@ public class AuthService {
 
     private final PasswordEncoder encoder;
 
+    private final FcmTokenService fcmTokenService;
+
     private final JwtService jwtService;
 
     private final RefreshTokenService refreshTokenService;
@@ -75,20 +77,24 @@ public AuthResponse register(RegisterRequest req) {
     public AuthResponse login(LoginRequest req) {
 
         User user = users.findByEmail(req.email())
-                .orElseThrow();
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!encoder.matches(req.password(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid password");
         }
 
-        String access = jwtService.generate(user);
+        // 👈 ယူဆာ Login အောင်မြင်ပြီဖြစ်၍ ၎င်း၏ FCM Token ကို အသစ်/အဟောင်း စစ်ပြီး Database ထဲ သိမ်းဆည်းခြင်း
+        if (req.fcmToken() != null && !req.fcmToken().isBlank()) {
+            // UserPrincipal သို့မဟုတ် User Entity တိုက်ရိုက် သုံးနိုင်ရန် FcmTokenService ပေါ်မူတည်၍ ပြင်ပါ
+            // ဤနေရာတွင် User Entity ကို တိုက်ရိုက် လက်ခံသည့် Method အသစ်ဖြင့် သိမ်းခြင်းဖြစ်ပါသည်
+            fcmTokenService.saveTokenForUser(user, req.fcmToken());
+        }
 
+        String access = jwtService.generate(user);
         String refresh = refreshTokenService.createToken(user);
 
         return new AuthResponse(access, refresh);
     }
-
-
 
     public AuthResponse refresh(
             RefreshRequest request

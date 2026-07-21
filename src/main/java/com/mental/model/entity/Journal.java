@@ -21,6 +21,7 @@ public class Journal extends BaseEntity {
     private boolean flagged;
     private String flagReason;
 
+
     /** Whether user marked this journal as a favourite */
     @Column(nullable = false)
     private boolean favourite = false;
