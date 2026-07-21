@@ -9,6 +9,7 @@ import com.mental.service.admin.AdminJournalService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.List;
 @Service
@@ -32,10 +33,17 @@ public class AdminJournalServiceImpl implements AdminJournalService {
     public List<JournalTrendDto> getJournalTrend() {
         return journalRepository.findJournalTrend()
                 .stream()
-                .map(row -> new JournalTrendDto(
-                        ((java.sql.Date) row[0]).toLocalDate(), // Date ကို LocalDate သို့ ပြောင်းခြင်း
-                        ((Number) row[1]).longValue()           // Count ကို Long သို့ ပြောင်းခြင်း
-                ))
+                .map(row -> {
+
+                    LocalDate date = (LocalDate) row[0];
+
+                    Long count = ((Number) row[1]).longValue();
+
+                    return new JournalTrendDto(
+                            date,
+                            count
+                    );
+                })
                 .toList();
     }
 }

@@ -1,12 +1,13 @@
 package com.mental.service.admin;
 
 import com.mental.dto.report.ReportDto;
+import com.mental.dto.report.ReportSummaryDto;
 
 public interface AdminReportService {
     // Reports
-    ReportDto userReport();
+    ReportSummaryDto userReport();
 
-    ReportDto moodReport();
+    ReportSummaryDto moodReport();
 
-    ReportDto meditationReport();
+    ReportSummaryDto meditationReport();
 }

@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface JournalRepository extends JpaRepository<Journal, Long> {
@@ -49,4 +50,20 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
         ORDER BY j.createdAt DESC
     """)
     List<JournalAdminDto> findAllJournalForAdmin();
+
+    @Query("""
+SELECT COUNT(j)
+FROM Journal j
+WHERE DATE(j.createdAt)=CURRENT_DATE
+""")
+    long countToday();
+
+
+
+    long countByFlaggedTrue();
+    Page<Journal> findAllByFlaggedTrue(
+            Pageable pageable
+    );
+
+    long countByCreatedAtBetween(LocalDateTime localDateTime, LocalDateTime now);
 }

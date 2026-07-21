@@ -1,6 +1,7 @@
 package com.mental.service.admin.impl;
 
 import com.mental.dto.report.ReportDto;
+import com.mental.dto.report.ReportSummaryDto;
 import com.mental.repository.MeditationSessionRepository;
 import com.mental.repository.MoodTrackingRepository;
 import com.mental.repository.UserRepository;
@@ -21,7 +22,7 @@ public class AdminReportServiceImpl implements AdminReportService {
 
 
     @Override
-    public ReportDto userReport() {
+    public ReportSummaryDto userReport() {
 
         long totalUsers =
                 userRepository.count();
@@ -36,23 +37,19 @@ public class AdminReportServiceImpl implements AdminReportService {
                 );
 
 
-        return ReportDto.builder()
-                .reason("USER_REPORT")
+        return ReportSummaryDto.builder()
+                .id(1L) // လိုအပ်သော ID (သို့မဟုတ် Database မှ ရလာသော ID)
+                .reportType("USER_REPORT")
                 .total(totalUsers)
                 .todayCount(todayUsers)
-                .growthPercentage(
-                        calculateGrowth(
-                                todayUsers,
-                                totalUsers
-                        )
-                )
-                .createdAt(LocalDateTime.now())
+                .growthPercentage(0.0)
+                .generatedAt(LocalDateTime.now())
                 .build();
     }
 
 
     @Override
-    public ReportDto moodReport() {
+    public ReportSummaryDto moodReport() {
 
 
         long totalMood =
@@ -61,27 +58,22 @@ public class AdminReportServiceImpl implements AdminReportService {
 
         long todayMood =
                 moodRepository.countToday();
-
-
-        return ReportDto.builder()
-                .reason("MOOD_REPORT")
+        return ReportSummaryDto.builder()
+                .id(1L) // လိုအပ်သော ID (သို့မဟုတ် Database မှ ရလာသော ID)
+                .reportType("MOOD_REPORT")
                 .total(totalMood)
                 .todayCount(todayMood)
-                .growthPercentage(
-                        calculateGrowth(
-                                todayMood,
-                                totalMood
-                        )
-                )
-                .createdAt(LocalDateTime.now())
+                .growthPercentage(0.0)
+                .generatedAt(LocalDateTime.now())
                 .build();
+
 
     }
 
 
 
     @Override
-    public ReportDto meditationReport() {
+    public ReportSummaryDto meditationReport() {
 
 
         long totalSession =
@@ -92,17 +84,13 @@ public class AdminReportServiceImpl implements AdminReportService {
                 meditationRepository.countToday();
 
 
-        return ReportDto.builder()
-                .reason("MEDITATION_REPORT")
-                .total(totalSession)
-                .todayCount(todaySession)
-                .growthPercentage(
-                        calculateGrowth(
-                                todaySession,
-                                totalSession
-                        )
-                )
-                .createdAt(LocalDateTime.now())
+        return ReportSummaryDto.builder()
+                .id(1L) // လိုအပ်သော ID (သို့မဟုတ် Database မှ ရလာသော ID)
+                .reportType("MEDITATION_REPORT")
+                .total(todaySession)
+                .todayCount(totalSession)
+                .growthPercentage(0.0)
+                .generatedAt(LocalDateTime.now())
                 .build();
 
     }

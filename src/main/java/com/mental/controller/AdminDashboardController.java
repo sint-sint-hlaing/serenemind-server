@@ -2,12 +2,12 @@ package com.mental.controller;
 
 import com.mental.dto.JournalDto;
 import com.mental.dto.UserDto;
+import com.mental.dto.dashboard.*;
 import com.mental.dto.mood.AuditLogDto;
 import com.mental.dto.mood.DashboardStatsDto;
 import com.mental.dto.mood.MoodDistributionDto;
 import com.mental.service.AdminDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,12 +48,6 @@ public class AdminDashboardController {
         return ResponseEntity.ok(adminDashboardService.getActiveUsers(pageable));
     }
 
-    @Operation(summary = "Get mood statistics")
-    @GetMapping("/summary/moods/count")
-    public ResponseEntity<DashboardStatsDto> getMoodsCount() {
-        log.info("Fetching mood statistics");
-        return ResponseEntity.ok(adminDashboardService.getMoodsCount());
-    }
 
     @Operation(summary = "Get mood distribution data")
     @GetMapping("/summary/reports")
@@ -62,30 +56,37 @@ public class AdminDashboardController {
         return ResponseEntity.ok(adminDashboardService.getMoodDistributionData());
     }
 
+
+    @Operation(summary = "Get mood statistics")
+    @GetMapping("/summary/moods")
+    public ResponseEntity<MoodStatsResponse> getMoodsCount() {
+        log.info("Fetching mood statistics");
+        return ResponseEntity.ok(adminDashboardService.getMoodsCount());
+    }
     @Operation(summary = "Get journals statistics")
-    @GetMapping("/summary/journals/count")
-    public ResponseEntity<DashboardStatsDto> getJournalsCount() {
+    @GetMapping("/summary/journals")
+    public ResponseEntity<JournalStatsResponse> getJournalsCount() {
         log.info("Fetching journals statistics");
         return ResponseEntity.ok(adminDashboardService.getJournalsCount());
     }
 
     @Operation(summary = "Get meditations statistics")
-    @GetMapping("/summary/meditations/count")
-    public ResponseEntity<DashboardStatsDto> getMeditationsCount() {
+    @GetMapping("/summary/meditations")
+    public ResponseEntity<MeditationStatsResponse> getMeditationsCount() {
         log.info("Fetching meditations statistics");
         return ResponseEntity.ok(adminDashboardService.getMeditationsCount());
     }
 
     @Operation(summary = "Get growth rate")
     @GetMapping("/summary/growth")
-    public ResponseEntity<DashboardStatsDto> getGrowthRate() {
+    public ResponseEntity<GrowthRateResponse> getGrowthRate() {
         log.info("Fetching growth rate");
         return ResponseEntity.ok(adminDashboardService.getMonthlyRate());
     }
 
     @Operation(summary = "Get audit logs with pagination")
     @GetMapping("/audit-logs")
-    public ResponseEntity<Page<AuditLogDto>> getAuditLogs(
+    public ResponseEntity<Page<AuditLogResponse>> getAuditLogs(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
         log.info("Fetching audit logs with pagination");
@@ -94,7 +95,7 @@ public class AdminDashboardController {
 
     @Operation(summary = "Get flagged journals with pagination")
     @GetMapping("/journals/flagged")
-    public ResponseEntity<Page<JournalDto>> getFlaggedJournals(
+    public ResponseEntity<Page<FlaggedJournalResponse>> getFlaggedJournals(
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
         log.info("Fetching flagged journals with pagination");
@@ -103,9 +104,10 @@ public class AdminDashboardController {
 
     @Operation(summary = "Resolve a flagged journal")
     @PutMapping("/journals/{id}/resolve")
-    public ResponseEntity<Void> resolveJournal(@PathVariable @Min(1) Long id) {
+    public ResponseEntity<ActionResponse> resolveJournal(@PathVariable @Min(1) Long id) {
         log.info("Resolving flagged journal with id: {}", id);
         adminDashboardService.resolveFlaggedJournal(id);
         return ResponseEntity.ok().build();
     }
+
 }

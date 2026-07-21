@@ -27,4 +27,6 @@ public interface UserRepository
     Page<User>findByIsActiveTrue(Pageable pageable);
 
     long countByCreatedAtBetween(LocalDateTime localDateTime, LocalDateTime now);
+
+    long countByIsActiveTrue();
 }

@@ -2,6 +2,7 @@ package com.mental.service.impl;
 
 import com.mental.dto.JournalDto;
 import com.mental.dto.UserDto;
+import com.mental.dto.dashboard.*;
 import com.mental.dto.mood.AuditLogDto;
 import com.mental.dto.mood.DashboardStatsDto;
 import com.mental.dto.mood.MoodDistributionDto;
@@ -18,7 +19,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -67,26 +67,242 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
     }
 
     @Override
-    public Page<AuditLogDto> getAuditLogs(Pageable pageable) {
-        log.debug("Fetching audit logs with pagination: {}", pageable);
-        return auditLogRepository.findAll(pageable)
-                .map(statsMapper::toAuditLogDto);
+    @Cacheable("moodStats")
+    public MoodStatsResponse getMoodsCount() {
+
+        log.info("Fetching mood statistics");
+
+
+        long totalEntries = moodRepository.count();
+
+
+        String mostCommonMood =
+                moodRepository.findMostCommonMood();
+
+
+        Double averageScore =
+                moodRepository.findAverageScore();
+
+
+        return new MoodStatsResponse(
+
+                totalEntries,
+
+                mostCommonMood != null
+                        ? mostCommonMood
+                        : "N/A",
+
+                averageScore != null
+                        ? averageScore
+                        : 0.0
+
+        );
     }
 
     @Override
-    public Page<JournalDto> getFlaggedJournals(Pageable pageable) {
-        log.debug("Fetching flagged journals with pagination: {}", pageable);
-        return journalRepository.findAllByFlaggedTrueOrderByCreatedAtDesc(pageable)
-                .map(journal -> JournalDto.builder()
-                        .id(journal.getId())
-                        .title(journal.getTitle())
-                        .content(journal.getContent())
-                        .isFlagged(journal.isFlagged())
-                        .flagReason(journal.getFlagReason())
-                        .createdAt(journal.getCreatedAt())
-                                .userId(journal.getUser().getId())
-                        .build());
+    public JournalStatsResponse getJournalsCount() {
+
+
+        log.info("Fetching journal statistics");
+
+
+        long total =
+                journalRepository.count();
+
+
+        long today =
+                journalRepository.countToday();
+
+
+
+        long flagged =
+                journalRepository.countByFlaggedTrue();
+
+
+
+        double growth =
+                calculateJournalGrowth();
+
+
+
+        return new JournalStatsResponse(
+
+                total,
+
+                today,
+
+                flagged,
+
+                growth
+
+        );
     }
+
+    @Override
+    public MeditationStatsResponse getMeditationsCount(){
+
+        log.info("Fetching meditation statistics");
+
+
+        long total =
+                meditationRepository.count();
+
+
+        long completed =
+                meditationRepository
+                        .countByCompletedTrue();
+
+
+
+        long activeUsers =
+                meditationRepository
+                        .countDistinctUsers();
+
+
+
+        double rate = 0;
+
+
+        if(total > 0){
+
+            rate =
+                    (completed *100.0)
+                            / total;
+
+        }
+
+
+
+        return new MeditationStatsResponse(
+
+                total,
+
+                completed,
+
+                activeUsers,
+
+                rate
+
+        );
+
+    }
+
+    @Override
+    @Cacheable("growthRate")
+    public GrowthRateResponse getMonthlyRate(){
+
+
+        log.info("Calculating monthly growth");
+
+
+        LocalDateTime now =
+                LocalDateTime.now();
+
+
+
+        long current =
+                userRepository
+                        .countByCreatedAtBetween(
+                                now.minusMonths(1),
+                                now
+                        );
+
+
+
+        long previous =
+                userRepository
+                        .countByCreatedAtBetween(
+                                now.minusMonths(2),
+                                now.minusMonths(1)
+                        );
+
+
+
+        double growth = 0;
+
+
+        if(previous > 0){
+
+            growth =
+                    ((current-previous)
+                            *100.0)
+                            /previous;
+
+        }
+
+
+
+        return new GrowthRateResponse(
+
+                current,
+
+                previous,
+
+                growth
+
+        );
+
+    }
+
+    @Override
+    public Page<AuditLogResponse> getAuditLogs(
+            Pageable pageable
+    ){
+
+
+        return auditLogRepository
+                .findAll(pageable)
+                .map(log ->
+
+                        new AuditLogResponse(
+
+                                log.getId(),
+
+                                log.getUsername(),
+
+                                log.getAction(),
+
+                                log.getDescription(),
+
+                                log.getCreatedAt()
+
+                        )
+
+                );
+
+    }
+
+    @Override
+    public Page<FlaggedJournalResponse> getFlaggedJournals(
+            Pageable pageable
+    ){
+
+
+        return journalRepository
+                .findAllByFlaggedTrue(pageable)
+
+                .map(journal ->
+
+                        new FlaggedJournalResponse(
+
+                                journal.getId(),
+
+                                journal.getTitle(),
+
+                                journal.getUser().getId(),
+
+                                journal.getFlagReason(),
+
+                                journal.isFlagged(),
+
+                                journal.getCreatedAt()
+
+                        )
+
+                );
+
+    }
+
 
     @Override
     @Transactional
@@ -102,63 +318,35 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
                 });
     }
 
-    @Override
-    @Cacheable("growthRate")
-    public DashboardStatsDto getMonthlyRate() {
-        log.debug("Calculating monthly growth rate");
 
-        LocalDateTime now = LocalDateTime.now();
-        long currentMonthUsers = userRepository.countByCreatedAtBetween(
-                now.minusMonths(1), now);
-        long previousMonthUsers = userRepository.countByCreatedAtBetween(
-                now.minusMonths(2), now.minusMonths(1));
+    private double calculateJournalGrowth(){
 
-        long growth = calculateGrowthPercentage(currentMonthUsers, previousMonthUsers);
 
-        return DashboardStatsDto.of(
-                currentMonthUsers,
-                growth,
-                0,
-                0,
-                0,
-                List.of()
-        );
-    }
+        LocalDateTime now =
+                LocalDateTime.now();
 
-    @Override
-    public DashboardStatsDto getMeditationsCount() {
-        return DashboardStatsDto.of(
-                0, 0, 0, 0,
-                meditationRepository.count(),
-                List.of()
-        );
-    }
 
-    @Override
-    public DashboardStatsDto getJournalsCount() {
-        return DashboardStatsDto.of(
-                0, 0, 0,
-                journalRepository.count(),
-                0,
-                List.of()
-        );
-    }
+        long current =
+                journalRepository.countByCreatedAtBetween(
+                        now.minusMonths(1),
+                        now
+                );
 
-    @Override
-    public DashboardStatsDto getMoodsCount() {
-        return DashboardStatsDto.of(
-                0, 0,
-                moodRepository.count(),
-                0,
-                0,
-                List.of()
-        );
-    }
 
-    private long calculateGrowthPercentage(long current, long previous) {
-        if (previous == 0) {
-            return 100;
-        }
-        return Math.round(((current - previous) * 100.0) / previous);
+        long previous =
+                journalRepository.countByCreatedAtBetween(
+                        now.minusMonths(2),
+                        now.minusMonths(1)
+                );
+
+
+        if(previous == 0)
+            return 0;
+
+
+        return ((current-previous)
+                *100.0)
+                / previous;
+
     }
 }

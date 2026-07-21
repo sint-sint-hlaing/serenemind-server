@@ -250,10 +250,10 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
 
         return distribution.stream()
                 .map(row -> {
-                    String moodName = (String) row[0];
+                    MoodType mood = (MoodType) row[0];
                     long count = (long) row[1];
                     double percentage = total > 0 ? (count * 100.0) / total : 0.0;
-                    return new MoodDistributionDto(moodName, count, percentage);
+                    return new MoodDistributionDto(mood, count, percentage);
                 })
                 .collect(Collectors.toList());
     }
@@ -262,26 +262,45 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
 
     @Override
     public List<MoodDistributionDto> getMoodAnalysis(int days) {
-        log.debug("Fetching mood analysis for last {} days", days);
 
-        LocalDate startDate = LocalDate.now().minusDays(days);
+        LocalDate startDate = LocalDate.now()
+                .minusDays(days);
 
-        List<Object[]> analysis = moodTrackingRepository.getMoodAnalysis(startDate);
 
-        if (analysis.isEmpty()) {
-            return new ArrayList<>();
-        }
+        List<Object[]> analysis =
+                moodTrackingRepository.getMoodAnalysis(startDate);
+
 
         long total = analysis.stream()
-                .mapToLong(row -> (long) row[1])
+                .mapToLong(row ->
+                        ((Number) row[1]).longValue()
+                )
                 .sum();
+
 
         return analysis.stream()
                 .map(row -> {
-                    String moodName = (String) row[0];
-                    long count = (long) row[1];
-                    double percentage = total > 0 ? (count * 100.0) / total : 0.0;
-                    return new MoodDistributionDto(moodName, count, percentage);
+
+                    MoodType mood =
+                            (MoodType) row[0];
+
+
+                    long count =
+                            ((Number) row[1]).longValue();
+
+
+                    double percentage =
+                            total > 0
+                                    ? (count * 100.0) / total
+                                    : 0;
+
+
+                    return new MoodDistributionDto(
+                            mood,
+                            count,
+                            percentage
+                    );
+
                 })
                 .collect(Collectors.toList());
     }

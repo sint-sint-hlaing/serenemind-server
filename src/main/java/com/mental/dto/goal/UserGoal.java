@@ -1,11 +1,13 @@
 package com.mental.dto.goal;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.mental.model.entity.enums.GoalStatus;
 import lombok.Builder;
 
 import java.time.LocalDate;
 
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record UserGoal(
         Long id,
         String username,

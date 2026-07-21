@@ -2,6 +2,7 @@ package com.mental.service.admin.impl;
 
 import com.mental.dto.Post.PostResponse;
 import com.mental.dto.report.ReportDto;
+import com.mental.dto.report.ReportSummaryDto;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.mapper.PostMapper;
 import com.mental.mapper.ReportMapper;
@@ -14,6 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -40,18 +42,27 @@ public class AdminCommunityServiceImpl implements AdminCommunityService {
     }
 
     @Override
-    public List<ReportDto> getReports() {
+    public List<ReportSummaryDto> getReports() {
         log.info("Fetching community reports");
 
         long totalReports = reportRepository.count();
         long todayReports = reportRepository.countTodayReports();
 
-        ReportDto report = reportMapper.toDto(totalReports, todayReports);
+        ReportSummaryDto summaryDto = ReportSummaryDto.builder()
+                .id(1L)
+                .reportType("COMMUNITY_REPORT")
+                .total(totalReports)
+                .todayCount(todayReports)
+                .growthPercentage(0.0)
+                .generatedAt(LocalDateTime.now())
+                .build();
 
-        return List.of(report);
+        // 👈 List တစ်ခုအဖြစ် ထည့်သွင်း၍ ပြန်ပေးခြင်း
+        return List.of(summaryDto);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<PostResponse> getCommunityPosts() {
         log.info("Fetching all community posts");
 

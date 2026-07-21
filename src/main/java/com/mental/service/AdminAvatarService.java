@@ -18,14 +18,13 @@ public class AdminAvatarService {
 
     private final AvatarMapper avatarMapper;
     private final AvatarRepository avatarRepository;
-    private final ImageService imageService;
-
+    private final CloudinaryService cloudinaryService;
     public AvatarResponse createAvatar(String name, MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new IllegalArgumentException("Avatar image is required");
         }
 
-        String imageUrl = imageService.upload(image);
+        String imageUrl = cloudinaryService.uploadImage(image);
 
         Avatar avatar = new Avatar();
         avatar.setName(name);
@@ -45,7 +44,7 @@ public class AdminAvatarService {
         }
 
         if (image != null && !image.isEmpty()) {
-            String imageUrl = imageService.upload(image);
+            String imageUrl = cloudinaryService.uploadImage(image);
             avatar.setImageUrl(imageUrl);
         }
 

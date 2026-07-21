@@ -95,4 +95,24 @@ public class CloudinaryService {
             return null;
         }
     }
+
+    public String storeFile(MultipartFile multipartFile, String audios) {
+        if (multipartFile == null || multipartFile.isEmpty()) {
+            return null;
+        }
+        try {
+            Map<?, ?> uploadRequest = cloudinary.uploader().upload(
+                    multipartFile.getBytes(),
+                    ObjectUtils.asMap(
+                            "resource_type", "auto",
+                            "folder", audios
+                    )
+            );
+            return uploadRequest.get("secure_url").toString();
+
+        } catch (Exception e) {
+            // RuntimeException မှာ message နဲ့ cause (e) ကိုသာ ထည့်ပေးရပါမယ်
+            throw new RuntimeException("Cloudinary သို့ ဖိုင်တင်ခြင်း မအောင်မြင်ပါ: " + e.getMessage(), e);
+        }
+    }
 }

@@ -8,10 +8,12 @@ import com.mental.model.entity.enums.MeditationCategory;
 import com.mental.model.entity.enums.MeditationStatus;
 import com.mental.repository.MeditationRepository;
 import com.mental.repository.MeditationSessionRepository;
+import com.mental.service.CloudinaryService;
 import com.mental.service.admin.AdminMeditationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -20,7 +22,7 @@ import java.util.List;
 public class AdminMeditationServiceImpl implements AdminMeditationService {
     private final MeditationRepository meditationRepository;
     private final MeditationSessionRepository meditationSessionRepository;
-
+    private final CloudinaryService cloudinaryService;
 
     @Override
     public List<MeditationAdminDto> getMeditations() {
@@ -63,19 +65,22 @@ public class AdminMeditationServiceImpl implements AdminMeditationService {
     public MeditationAdminDto createMeditation(
             MeditationRequest request
     ) {
+        // 1. Audio ဖိုင်ကို Upload လုပ်ပြီး URL ရယူခြင်း
+        String audioUrl = null;
+        if (request.audioFile() != null && !request.audioFile().isEmpty()) {
+            audioUrl = cloudinaryService.storeFile(request.audioFile(), "audios");
+        }
+
+        // 2. Image ဖိုင်ကို Upload လုပ်ပြီး URL ရယူခြင်း
+        String imageUrl = null;
+        if (request.imageFile() != null && !request.imageFile().isEmpty()) {
+            imageUrl = cloudinaryService.storeFile(request.imageFile(), "images");
+        }
 
         Meditation meditation = new Meditation();
 
-
-        meditation.setTitle(
-                request.title()
-        );
-
-
-        meditation.setDescription(
-                request.description()
-        );
-
+        meditation.setTitle(request.title());
+        meditation.setDescription(request.description());
 
         meditation.setCategories(
                 MeditationCategory.valueOf(
@@ -83,49 +88,35 @@ public class AdminMeditationServiceImpl implements AdminMeditationService {
                 )
         );
 
+        // 3. Difficulty ထည့်သွင်းခြင်း
+        meditation.setDifficulty(request.difficulty());
 
-        meditation.setDuration(
-                request.duration()
-        );
+        // 4. Duration နှင့် DurationSeconds တွက်ချက်ထည့်သွင်းခြင်း
+        meditation.setDuration(request.duration());
 
+        Integer durationInMinutes = Integer.parseInt(request.duration());
+        Integer durationInSeconds = durationInMinutes * 60; // မိနစ်ကို စက္ကန့်ပြောင်းခြင်း
+        meditation.setDurationSeconds(durationInSeconds);
 
-        meditation.setAudioUrl(
-                request.audioUrl()
-        );
+        meditation.setAudioUrl(audioUrl);
+        meditation.setImageUrl(imageUrl);
 
+        // Status ကို တစ်ကြိမ်သာ သတ်မှတ်ပါ
+        meditation.setStatus(MeditationStatus.DRAFT);
 
-        meditation.setImageUrl(
-                request.imageUrl()
-        );
+        // 5. Database ထဲသို့ တစ်ကြိမ်တည်း သိမ်းဆည်းခြင်း
+        Meditation saved = meditationRepository.save(meditation);
 
-
-        meditation.setStatus(
-                MeditationStatus.DRAFT
-        );
-
-
-        Meditation saved =
-                meditationRepository.save(meditation);
-
-
+        // 6. Response DTO ပြန်ထုတ်ပေးခြင်း
         return MeditationAdminDto.builder()
-
                 .id(saved.getId())
-
                 .title(saved.getTitle())
-
                 .description(saved.getDescription())
-
                 .category(saved.getCategories().name())
-
                 .duration(Integer.valueOf(saved.getDuration()))
-
                 .audioUrl(saved.getAudioUrl())
-
                 .imageUrl(saved.getImageUrl())
-
                 .active(false)
-
                 .createdAt(saved.getCreatedAtAsInstant())
                 .build();
     }
@@ -137,13 +128,17 @@ public class AdminMeditationServiceImpl implements AdminMeditationService {
         return meditationSessionRepository
                 .findMeditationTrend()
                 .stream()
-                .map(row -> new MeditationTrendDto(
-                        ((java.sql.Date) row[0])
-                                .toLocalDate(),
+                .map(row -> {
 
-                        ((Number) row[1])
-                                .longValue()
-                ))
+                    LocalDate date = (LocalDate) row[0];
+
+                    Long count = ((Number) row[1]).longValue();
+
+                    return new MeditationTrendDto(
+                            date,
+                            count
+                    );
+                })
                 .toList();
     }
 

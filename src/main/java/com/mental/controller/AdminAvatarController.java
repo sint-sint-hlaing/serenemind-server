@@ -25,8 +25,9 @@ public class AdminAvatarController {
 
 
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public AvatarResponse createAvatar(
+    @PostMapping
+            (consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public AvatarResponse  createAvatar(
 
             @RequestParam String name,
 

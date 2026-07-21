@@ -7,6 +7,7 @@ import com.mental.dto.admin.*;
 import com.mental.dto.goal.UserGoal;
 import com.mental.dto.meditation.MeditationRequest;
 import com.mental.dto.report.ReportDto;
+import com.mental.dto.report.ReportSummaryDto;
 import com.mental.service.admin.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -74,7 +75,7 @@ public class AdminController {
     @Operation(summary = "Create a new meditation")
     @PostMapping("/meditations")
     public ResponseEntity<MeditationAdminDto> createMeditation(
-            @Valid @RequestBody MeditationRequest request) {
+            @Valid @ModelAttribute MeditationRequest request) {
         log.info("Creating new meditation: {}", request.title());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(adminMeditationService.createMeditation(request));
@@ -126,7 +127,7 @@ public class AdminController {
 
     @Operation(summary = "Get community reports")
     @GetMapping("/community/reports")
-    public ResponseEntity<List<ReportDto>> getCommunityReports() {
+    public ResponseEntity<List<ReportSummaryDto>> getCommunityReports() {
         log.info("Fetching community reports");
         return ResponseEntity.ok(adminCommunityService.getReports());
     }
@@ -135,21 +136,21 @@ public class AdminController {
 
     @Operation(summary = "Get user report")
     @GetMapping("/reports/users")
-    public ResponseEntity<ReportDto> userReport() {
+    public ResponseEntity<ReportSummaryDto> userReport() {
         log.info("Fetching user report");
         return ResponseEntity.ok(adminReportService.userReport());
     }
 
     @Operation(summary = "Get mood report")
     @GetMapping("/reports/mood")
-    public ResponseEntity<ReportDto> moodReport() {
+    public ResponseEntity<ReportSummaryDto> moodReport() {
         log.info("Fetching mood report");
         return ResponseEntity.ok(adminReportService.moodReport());
     }
 
     @Operation(summary = "Get meditation report")
     @GetMapping("/reports/meditation")
-    public ResponseEntity<ReportDto> meditationReport() {
+    public ResponseEntity<ReportSummaryDto> meditationReport() {
         log.info("Fetching meditation report");
         return ResponseEntity.ok(adminReportService.meditationReport());
     }

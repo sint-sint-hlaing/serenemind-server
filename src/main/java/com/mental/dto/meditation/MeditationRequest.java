@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Builder;
+import org.springframework.web.multipart.MultipartFile;
 
 @Builder
 public record MeditationRequest(
@@ -17,7 +18,9 @@ public record MeditationRequest(
         String category,
         @Min(value = 1, message = "Duration must be at least 1 minute")
         String duration,
-        String audioUrl,
-        String imageUrl
+        @NotNull(message = "Difficulty is required") // 👈 ၁။ ဒီလိုင်း အသစ်ထည့်ပါ
+        Integer difficulty,
+        MultipartFile audioFile, // Audio File လက်ခံရန်
+        MultipartFile imageFile
 ) {
 }

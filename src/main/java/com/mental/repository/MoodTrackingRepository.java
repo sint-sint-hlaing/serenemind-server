@@ -102,6 +102,15 @@ public interface MoodTrackingRepository extends JpaRepository<MoodEntry, Long> {
             @Param("year") int year,
             @Param("month") int month
     );
+    @Query("""
+    SELECT m.mood, COUNT(m)
+    FROM MoodEntry m
+    WHERE m.date >= :startDate
+    GROUP BY m.mood
+""")
+    List<Object[]> getMoodAnalysis(
+            @Param("startDate") LocalDate startDate
+    );
 
     // ============================================================
     // DISTRIBUTION QUERIES
@@ -109,16 +118,31 @@ public interface MoodTrackingRepository extends JpaRepository<MoodEntry, Long> {
 
     @Query("SELECT m.mood, COUNT(m) FROM MoodEntry m GROUP BY m.mood")
     List<Object[]> getMoodDistribution();
+    @Query("SELECT COUNT(m) FROM MoodEntry m WHERE FUNCTION('DATE', m.createdAt) = CURRENT_DATE")
+    long countToday();
 
-    @Query("SELECT m.mood, COUNT(m) FROM MoodEntry m WHERE m.date >= :startDate GROUP BY m.mood")
-    List<Object[]> getMoodAnalysis(@Param("startDate") LocalDate startDate);
+    @Query("""
+        SELECT m.mood
+        FROM MoodEntry m
+        GROUP BY m.mood
+        ORDER BY COUNT(m) DESC
+        LIMIT 1
+    """)
+    String findMostCommonMood();
+
+
+
+    @Query("""
+        SELECT AVG(m.score)
+        FROM MoodEntry m
+    """)
+    Double findAverageScore();
 
     // ============================================================
     // COUNT QUERIES
     // ============================================================
 
-    @Query("SELECT COUNT(m) FROM MoodEntry m WHERE FUNCTION('DATE', m.createdAt) = CURRENT_DATE")
-    long countToday();
+
 
     @Query("SELECT COUNT(m) FROM MoodEntry m WHERE m.mood = :mood")
     long countByMood(@Param("mood") MoodType mood);

@@ -26,5 +26,12 @@ public class Avatar {
     private Boolean isActive=false;
     private LocalDateTime createdAt;
 
+    @PrePersist
+    public void prePersist() {
+        createdAt = LocalDateTime.now();
 
+        if (isActive == null) {
+            isActive = true;
+        }
+    }
 }

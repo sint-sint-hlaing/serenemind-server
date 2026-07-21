@@ -15,7 +15,7 @@ public class AuditService {
                 .username(username)
                 .action(action)
                 .targetId(targetId)
-                .details(details)
+                .description(details)
                 .build();
         auditLogRepository.save(log);
     }

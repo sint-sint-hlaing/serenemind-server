@@ -60,4 +60,13 @@ public interface MeditationRepository
     List<Meditation> searchByKeyword(
             @Param("keyword") String keyword
     );
+
+    long countByCompletedTrue();
+
+
+    @Query("""
+SELECT COUNT(DISTINCT m.user.id)
+FROM MeditationSession m
+""")
+    long countDistinctUsers();
 }
