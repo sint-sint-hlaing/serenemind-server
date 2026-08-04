@@ -34,4 +34,6 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
 
     /** Count journals by user (used in dashboard streak/stats) */
     long countByUser(User user);
+
+    long countByUserId(Long userId);
 }

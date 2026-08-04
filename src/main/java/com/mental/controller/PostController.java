@@ -53,6 +53,16 @@ public class PostController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
+    // UI - Post တစ်ခုကို ဖျက်ခြင်း (Delete Post)
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePost(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        postService.deletePost(id, userPrincipal);
+        return ResponseEntity.noContent().build(); // 204 No Content
+    }
+
     // UI - Post တစ်ခုကို Like ပေးခြင်း သို့မဟုတ် Like ပြန်ဖြုတ်ခြင်း (Toggle)
     @PostMapping("/{id}/like")
     public ResponseEntity<Void> toggleLikePost(
@@ -60,6 +70,25 @@ public class PostController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         postService.toggleLikePost(id, userPrincipal);
+        return ResponseEntity.ok().build();
+    }
+
+
+    @GetMapping("/saved")
+    public ResponseEntity<List<PostResponse>> getSavedPosts(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        List<PostResponse> savedPosts = postService.getSavedPosts(userPrincipal);
+        return ResponseEntity.ok(savedPosts);
+    }
+
+
+    @PostMapping("/{id}/save")
+    public ResponseEntity<Void> toggleSavePost(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        postService.toggleSavePost(id, userPrincipal);
         return ResponseEntity.ok().build();
     }
 }

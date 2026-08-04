@@ -2,10 +2,12 @@ package com.mental.service;
 
 import com.mental.dto.ProfileResponse;
 import com.mental.dto.UpdateProfileRequest;
+import com.mental.dto.user.UserActivityResponse;
 import com.mental.model.entity.User;
 import com.mental.model.entity.UserProfile;
-import com.mental.repository.UserProfileRepository;
-import com.mental.repository.UserRepository;
+import com.mental.model.entity.enums.GoalStatus;
+import com.mental.repository.*;
+import com.mental.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,25 @@ public class UserProfileService {
 
     private final UserRepository userRepository;
     private final UserProfileRepository userProfileRepository;
+    private final JournalRepository journalRepository;
+    private final UserGoalRepository userGoalRepository;
+    private final PostRepository postRepository;
+
+    @Transactional(readOnly = true)
+    public UserActivityResponse getUserActivity(UserPrincipal userPrincipal) {
+        User user = userRepository.findByEmail(userPrincipal.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        long journalCount = journalRepository.countByUserId(user.getId());
+        long completedGoalsCount = userGoalRepository.countByUserIdAndStatus(user.getId(), GoalStatus.COMPLETED);
+        long postCount = postRepository.countByUserId(user.getId());
+
+        return UserActivityResponse.builder()
+                .totalJournals(journalCount)
+                .goalsCompleted(completedGoalsCount)
+                .totalPosts(postCount)
+                .build();
+    }
 
     public ProfileResponse getProfile(String email) {
         User user = userRepository.findByEmail(email)
@@ -67,4 +88,7 @@ public class UserProfileService {
         if (profile.getBirthday() != null) percentage += 20;
         return percentage;
     }
+
+
+
 }

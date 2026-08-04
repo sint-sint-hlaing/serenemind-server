@@ -2,6 +2,7 @@ package com.mental.repository;
 
 import com.mental.model.entity.User;
 import com.mental.model.entity.UserGoal;
+import com.mental.model.entity.enums.GoalStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Collection;
@@ -12,4 +13,6 @@ public interface UserGoalRepository extends JpaRepository<UserGoal, Long> {
     List<UserGoal> findByUserUsername(String username);
 
     List<UserGoal> findByUser(User user);
+
+    long countByUserIdAndStatus(Long userId, GoalStatus status);
 }

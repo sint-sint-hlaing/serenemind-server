@@ -14,4 +14,6 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     // Popular filter အတွက် (Like အများဆုံး ပို့စ်များကို အရင်ပြရန်)
     List<Post> findAllByOrderByLikeCountDesc();
+
+    long countByUserId(Long userId);
 }
