@@ -8,10 +8,10 @@ import java.time.LocalDate;
 @Getter
 @Setter
 public class ProfileResponse {
-    private String username;
-    private String email;
     private String fullname;
+    private String email;
     private String avatar;
+    private String bio;
+    private String username;
     private LocalDate birthday;
-    private int profileCompletionPercentage;
 }

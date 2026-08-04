@@ -21,4 +21,5 @@ public class UserProfile extends BaseEntity {
     private String fullname;
     private String avatar;
     private LocalDate birthday;
+    private String bio;
 }

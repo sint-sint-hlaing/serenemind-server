@@ -21,7 +21,7 @@ public class PostController {
 
     private final PostService postService;
 
-    // UI - Community Screen (Popular, Recent, Following feed များအတွက်)
+    // UI - Community Screen (Popular, Recent feed များအတွက်)
     @GetMapping
     public ResponseEntity<List<PostResponse>> getAllPosts(
             @AuthenticationPrincipal UserPrincipal userPrincipal,

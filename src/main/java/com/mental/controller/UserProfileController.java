@@ -1,12 +1,15 @@
 package com.mental.controller;
 
+
 import com.mental.dto.ProfileResponse;
 import com.mental.dto.UpdateProfileRequest;
+import com.mental.dto.user.PersonalInformationResponse;
 import com.mental.dto.user.UserActivityResponse;
 import com.mental.security.UserPrincipal;
 import com.mental.service.UserProfileService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -25,12 +28,11 @@ public class UserProfileController {
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/me")
+    @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ProfileResponse> updateMyProfile(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @Valid @RequestBody UpdateProfileRequest request) {
+            @Valid @ModelAttribute UpdateProfileRequest request) {
 
-        // Update လုပ်တဲ့နေရာမှာလည်း userPrincipal.getUsername() ကိုပဲ သုံးပါမယ်
         ProfileResponse response = userProfileService.updateProfile(userPrincipal.getEmail(), request);
         return ResponseEntity.ok(response);
     }
@@ -41,5 +43,13 @@ public class UserProfileController {
 
         UserActivityResponse activity = userProfileService.getUserActivity(userPrincipal);
         return ResponseEntity.ok(activity);
+    }
+
+    @GetMapping("/personal-info")
+    public ResponseEntity<PersonalInformationResponse> getPersonalInformation(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        PersonalInformationResponse response = userProfileService.getPersonalInformation(userPrincipal.getEmail());
+        return ResponseEntity.ok(response);
     }
 }

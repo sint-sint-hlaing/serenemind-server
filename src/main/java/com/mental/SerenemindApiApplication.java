@@ -9,8 +9,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 import java.util.TimeZone;
 
 @EnableScheduling
-@SpringBootApplication
 @EnableAsync
+@SpringBootApplication
 public class SerenemindApiApplication {
 
 	@PostConstruct

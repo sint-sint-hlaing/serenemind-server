@@ -1,5 +1,6 @@
 package com.mental.service;
 
+import com.mental.dto.user.PersonalInformationResponse;
 import com.mental.dto.ProfileResponse;
 import com.mental.dto.UpdateProfileRequest;
 import com.mental.dto.user.UserActivityResponse;
@@ -22,6 +23,7 @@ public class UserProfileService {
     private final JournalRepository journalRepository;
     private final UserGoalRepository userGoalRepository;
     private final PostRepository postRepository;
+    private final CloudinaryService cloudinaryService;
 
     @Transactional(readOnly = true)
     public UserActivityResponse getUserActivity(UserPrincipal userPrincipal) {
@@ -46,14 +48,12 @@ public class UserProfileService {
         UserProfile profile = user.getProfile();
 
         ProfileResponse response = new ProfileResponse();
-        response.setUsername(user.getUsername());
         response.setEmail(user.getEmail());
         response.setFullname(profile.getFullname());
-        response.setAvatar(profile.getAvatar());
+        response.setAvatar(profile != null ? profile.getAvatar() : null);
+        response.setBio(profile != null ? profile.getBio() : "Be kind to your mind.");
+        response.setUsername(user.getUsername());
         response.setBirthday(profile.getBirthday());
-
-        // UI အလှဆင်ဖို့အတွက် Completion Percentage တွက်ချက်ခြင်း
-        response.setProfileCompletionPercentage(calculateCompletion(profile));
 
         return response;
     }
@@ -61,8 +61,13 @@ public class UserProfileService {
     @Transactional
     public ProfileResponse updateProfile(String email, UpdateProfileRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
+        // 1. Update Username if provided and changed
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            user.setUsername(request.getUsername());
+            userRepository.save(user);
+        }
 
         UserProfile profile = user.getProfile();
 
@@ -73,12 +78,25 @@ public class UserProfileService {
         }
 
         profile.setFullname(request.getFullname());
-        profile.setAvatar(request.getAvatar());
         profile.setBirthday(request.getBirthday());
+        profile.setBio(request.getBio());
+
+
+        // 2. Handle Cloudinary Image Upload
+        if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
+            // Delete old avatar if present
+            if (profile.getAvatar() != null && !profile.getAvatar().isBlank()) {
+                cloudinaryService.deleteImage(profile.getAvatar());
+            }
+
+            // Upload new image
+            String newImageUrl = cloudinaryService.uploadImage(request.getAvatar());
+            profile.setAvatar(newImageUrl);
+        }
 
         userProfileRepository.save(profile);
 
-        return getProfile(email); // နောက်ဆုံး Update ဖြစ်သွားတဲ့ Data ကို Response အနေနဲ့ ပြန်ပေးခြင်း
+        return getProfile(email);
     }
 
     private int calculateCompletion(UserProfile profile) {
@@ -89,6 +107,23 @@ public class UserProfileService {
         return percentage;
     }
 
+    @Transactional(readOnly = true)
+    public PersonalInformationResponse getPersonalInformation(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+
+        UserProfile profile = user.getProfile();
+
+        return PersonalInformationResponse.builder()
+                .fullname(profile != null ? profile.getFullname() : null)
+                .email(user.getEmail())
+                .username(user.getUsername())
+                .birthday(profile != null ? profile.getBirthday() : null)
+                .accountStatus("Active") // Or pull dynamically from user entity if available: user.getStatus().name()
+                .role(user.getRole() != null ? user.getRole().name() : "User")
+                .memberSince(user.getCreatedAt())
+                .build();
+    }
 
 
 }
