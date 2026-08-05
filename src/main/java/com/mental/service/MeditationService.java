@@ -1,24 +1,31 @@
 package com.mental.service;
 
 import com.mental.dto.MeditationSessionRequest;
-import com.mental.dto.meditation.MeditationCategoryResponse;
-import com.mental.dto.meditation.MeditationDashboardResponse;
-import com.mental.dto.meditation.MeditationResponse;
+import com.mental.dto.meditation.*;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.mapper.MeditationMapper;
+import com.mental.model.entity.Favorite;
 import com.mental.model.entity.Meditation;
 import com.mental.model.entity.MeditationSession;
 import com.mental.model.entity.User;
+import com.mental.repository.FavoriteRepository;
 import com.mental.repository.MeditationRepository;
 import com.mental.repository.MeditationSessionRepository;
 import com.mental.repository.UserRepository;
+import com.nimbusds.jose.util.Resource;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -30,6 +37,8 @@ public class MeditationService {
     private final MeditationSessionRepository sessionRepository;
     private final UserRepository userRepository;
     private final MeditationMapper meditationMapper;
+    private final FavoriteRepository favoriteRepository;
+    private final MeditationSessionRepository  meditationSessionRepository;
 
     @Transactional(readOnly = true)
     public List<MeditationResponse> getAll() {
@@ -141,5 +150,162 @@ public class MeditationService {
             case "STRESS" -> "💆";
             default -> "🧘";
         };
+    }
+
+    public Resource downloadAudio(Long id) {
+
+        Meditation meditation = meditationRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Meditation not found"));
+
+        try {
+
+            Path path = Paths.get(meditation.getAudioUrl());
+
+            org.springframework.core.io.Resource resource = new UrlResource(path.toUri());
+
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new RuntimeException("Audio file not found.");
+            }
+
+            return (Resource) resource;
+
+        } catch (MalformedURLException e) {
+            throw new RuntimeException("Cannot download audio.", e);
+        }
+    }
+
+    @Transactional
+    public FavoriteResponse toggleFavorite(Long id, Long meditationId) {
+        Optional<Favorite> favorite =
+                favoriteRepository.findByUserIdAndMeditationId(id, meditationId);
+
+        if (favorite.isPresent()) {
+
+            favoriteRepository.delete(favorite.get());
+
+            return new FavoriteResponse(
+                    false,
+                    "Removed from favorites");
+
+        }
+
+        User user = userRepository.findById(id)
+                .orElseThrow();
+
+        Meditation meditation = meditationRepository.findById(meditationId)
+                .orElseThrow();
+
+        Favorite newFavorite = new Favorite();
+        newFavorite.setUser(user);
+        newFavorite.setMeditation(meditation);
+
+        favoriteRepository.save(newFavorite);
+
+        return new FavoriteResponse(
+                true,
+                "Added to favorites");
+    }
+
+        public TimerResponse saveTimer(
+                Long userId,
+                Long meditationId,
+                TimerRequest request) {
+
+
+            MeditationSession timer =
+                    new MeditationSession();
+
+
+            timer.setMinutes(request.getMinutes());
+
+
+            timer.setUser(
+                    userRepository.findById(userId)
+                            .orElseThrow());
+
+
+            timer.setMeditation(
+                    meditationRepository.findById(meditationId)
+                            .orElseThrow());
+
+
+            meditationSessionRepository.save(timer);
+
+
+            return new TimerResponse(
+                    request.getMinutes(),
+                    "Timer saved successfully");
+        }
+
+    public ShareResponse getShareLink(Long id) {
+        Meditation meditation = meditationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Meditation not found"));
+
+        return ShareResponse.builder()
+                .title(meditation.getTitle())
+                .description(meditation.getDescription())
+                .imageUrl(meditation.getImageUrl())
+                .shareUrl("https://serenemind.com/meditations/" + meditation.getId())
+                .build();
+    }
+
+    public MeditationResponse getPrevious(Long id) {
+        Meditation meditation =
+                meditationRepository
+                        .findFirstByIdLessThanOrderByIdDesc(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException("Previous meditation not found"));
+
+        return meditationMapper.toResponse(meditation);
+    }
+
+    public MeditationList getNext(Long id) {
+
+
+        Meditation meditation =
+                meditationRepository
+                        .findFirstByIdGreaterThanOrderByIdAsc(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Next meditation not found"));
+
+
+        return meditationMapper.toListResponse(meditation);
+    }
+
+    public Resource stream(Long id) {
+
+
+        Meditation meditation =
+                meditationRepository.findById(id)
+                        .orElseThrow(() ->
+                                new ResourceNotFoundException(
+                                        "Meditation not found"));
+
+
+        try {
+
+            Path path =
+                    Paths.get(meditation.getAudioUrl());
+
+
+            org.springframework.core.io.Resource resource =
+                    new UrlResource(path.toUri());
+
+
+            if (!resource.exists()) {
+                throw new RuntimeException(
+                        "Audio file not found");
+            }
+
+
+            return (Resource) resource;
+
+
+        } catch (MalformedURLException e) {
+
+            throw new RuntimeException(e);
+        }
     }
 }

@@ -35,6 +35,8 @@ public class MeditationSession extends BaseEntity {
     @Column(nullable = false)
     private boolean completed = false;
 
+    private Integer minutes;
+
 
     private Instant completedAt;
 

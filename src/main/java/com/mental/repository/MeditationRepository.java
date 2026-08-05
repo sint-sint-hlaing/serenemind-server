@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 
 public interface MeditationRepository
@@ -18,7 +19,9 @@ public interface MeditationRepository
     List<Meditation> findByCategories(
             MeditationCategory categories
     );
+    Optional<Meditation> findFirstByIdLessThanOrderByIdDesc(Long id);
 
+    Optional<Meditation> findFirstByIdGreaterThanOrderByIdAsc(Long id);
 
 
     @Query("""
