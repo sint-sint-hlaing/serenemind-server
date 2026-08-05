@@ -3,6 +3,7 @@ package com.mental.service;
 import com.mental.dto.chat.ChatRequest;
 import com.mental.dto.chat.ConversationResponse;
 import com.mental.dto.chat.MessageResponse;
+import com.mental.model.entity.BaseEntity;
 import com.mental.model.entity.Conversation;
 import com.mental.model.entity.Message;
 import com.mental.repository.ConversationRepository;
@@ -13,6 +14,8 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -55,7 +58,15 @@ public class ChatService {
                     .orElseThrow(() -> new RuntimeException("Conversation not found"));
         }
 
-        // ၂။ User Message ကို သိမ်းဆည်းခြင်း
+        // ၂။ ယခင် Chat History များကို database မှ ဆွဲထုတ်ခြင်း (Context သိစေရန်)
+        List<Message> previousMessages = messageRepository.findByConversationIdOrderByTimestampAsc(conversation.getId());
+
+        StringBuilder historyBuilder = new StringBuilder();
+        for (Message m : previousMessages) {
+            historyBuilder.append(m.getSender()).append(": ").append(m.getContent()).append("\n");
+        }
+
+        // ၃။ User Message အသစ်ကို Database ထဲ သိမ်းဆည်းခြင်း
         Message userMessage = messageRepository.save(
                 Message.builder()
                         .conversation(conversation)
@@ -64,15 +75,19 @@ public class ChatService {
                         .build()
         );
 
-        // ၃. Groq AI (Llama 3) ထံမှ အဖြေတောင်းခံခြင်း
+        // ၄။ ယခင် History အပါအဝင် လက်ရှိမက်ဆေ့ချ်ကို AI ထံ ပို့ရန် Prompt တည်ဆောက်ခြင်း
+        String fullPrompt = "Conversation History:\n" + historyBuilder.toString() +
+                "user: " + request.getMessage() + "\nassistant:";
+
+        // ၅။ Groq AI (Llama 3) ထံမှ အဖြေတောင်းခံခြင်း
         ChatClient chatClient = chatClientBuilder.build();
         String aiResponseText = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
-                .user(request.getMessage())
+                .user(fullPrompt)
                 .call()
                 .content();
 
-        // ၄။ AI Response ကို သိမ်းဆည်းခြင်း
+        // ၆။ AI Response ကို Database ထဲ သိမ်းဆည်းခြင်း
         Message aiMessage = messageRepository.save(
                 Message.builder()
                         .conversation(conversation)
@@ -81,7 +96,7 @@ public class ChatService {
                         .build()
         );
 
-        // ၅. Response ပြန်ထုတ်ရန် map လုပ်ခြင်း
+        // ၇. Response ပြန်ထုတ်ရန် map လုပ်ခြင်း
         List<MessageResponse> messageResponses = List.of(userMessage, aiMessage).stream()
                 .map(m -> MessageResponse.builder()
                         .id(m.getId())
@@ -100,22 +115,41 @@ public class ChatService {
     }
 
     public List<ConversationResponse> getUserConversations(UserPrincipal userPrincipal) {
-        return conversationRepository.findByUserIdOrderByCreatedAtDesc(userPrincipal.getId())
-                .stream()
-                .map(conv -> ConversationResponse.builder()
-                        .id(conv.getId())
-                        .title(conv.getTitle())
-                        .createdAt(conv.getCreatedAt())
-                        .messages(
-                                messageRepository.findByConversationIdOrderByTimestampAsc(conv.getId())
-                                        .stream().map(m -> MessageResponse.builder()
-                                                .id(m.getId())
-                                                .sender(m.getSender())
-                                                .content(m.getContent())
-                                                .timestamp(m.getTimestamp())
-                                                .build()).toList()
-                        )
-                        .build())
+        List<Conversation> conversations = conversationRepository.findByUserIdOrderByCreatedAtDesc(userPrincipal.getId());
+
+        return conversations.stream()
+                .map(conv -> {
+                    List<Message> messages = messageRepository.findByConversationIdOrderByTimestampAsc(conv.getId());
+
+                    // Message ၏ timestamp ကို မသုံးဘဲ Conversation ၏ createdAt (သို့မဟုတ် မက်ဆေ့ချ်များထဲမှ အသစ်ဆုံး createdAt) ကို ယူခြင်း
+                    Instant lastActivityTime = messages.stream()
+                            .map(BaseEntity::getCreatedAt) // Message သည် BaseEntity ကို inheritance လုပ်ထားသဖြင့် createdAt ကို ယူနိုင်သည်
+                            .filter(java.util.Objects::nonNull)
+                            .max(Instant::compareTo)
+                            .orElse(conv.getCreatedAt());
+
+                    List<MessageResponse> messageResponses = messages.stream()
+                            .map(m -> MessageResponse.builder()
+                                    .id(m.getId())
+                                    .sender(m.getSender())
+                                    .content(m.getContent())
+                                    .timestamp(m.getCreatedAt() != null ? LocalDateTime.ofInstant(m.getCreatedAt(), java.time.ZoneId.systemDefault()) : null)
+                                    .build())
+                            .toList();
+
+                    return new Object[] {
+                            lastActivityTime,
+                            ConversationResponse.builder()
+                                    .id(conv.getId())
+                                    .title(conv.getTitle())
+                                    .createdAt(conv.getCreatedAt())
+                                    .messages(messageResponses)
+                                    .build()
+                    };
+                })
+                // Instant (createdAt) အလိုက် အသစ်ဆုံးကို အပေါ်ဆုံးတင်ရန် Descending စီခြင်း
+                .sorted((a, b) -> ((Instant) b[0]).compareTo((Instant) a[0]))
+                .map(obj -> (ConversationResponse) obj[1])
                 .toList();
     }
 
