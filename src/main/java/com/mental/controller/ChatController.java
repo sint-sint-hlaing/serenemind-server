@@ -2,6 +2,7 @@ package com.mental.controller;
 
 import com.mental.dto.chat.ChatRequest;
 import com.mental.dto.chat.ConversationResponse;
+import com.mental.dto.chat.MessageResponse;
 import com.mental.security.UserPrincipal;
 import com.mental.service.ChatService;
 import lombok.RequiredArgsConstructor;
@@ -33,5 +34,13 @@ public class ChatController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         List<ConversationResponse> conversations = chatService.getUserConversations(userPrincipal);
         return ResponseEntity.ok(conversations);
+    }
+
+    @GetMapping("/conversations/{id}/messages")
+    public ResponseEntity<List<MessageResponse>> getConversationMessages(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+        List<MessageResponse> messages = chatService.getMessagesByConversationId(id, userPrincipal);
+        return ResponseEntity.ok(messages);
     }
 }

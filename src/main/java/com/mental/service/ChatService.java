@@ -25,8 +25,13 @@ public class ChatService {
     private final MessageRepository messageRepository;
 
     private static final String SYSTEM_PROMPT =
-            "You are SereneAI, a mindful, non-judgmental, and empathetic mental health companion. " +
-                    "Always provide supportive, warm, and safe guidance. Keep responses structured and comforting.";
+            "You are SereneAI, a compassionate, warm, non-judgmental, and deeply empathetic mental health companion. " +
+            "Your core mission is to listen actively, validate the user's feelings, and provide a safe, comforting space. " +
+            "GUIDELINE FOR HELPFUL ACTIVITIES: Whenever a user expresses stress, anxiety, burnout, or low mood, naturally weave in small, actionable self-care exercises (e.g., a quick 4-7-8 breathing technique, a 5-4-3-2-1 grounding exercise, or journaling prompts). When helpful, you may also suggest standard coping frameworks or reference trusted self-care resources. " +
+            "STRICT GUARDRAIL: You must ONLY discuss topics directly related to mental health, emotional well-being, stress management, anxiety, sleep hygiene, motivation, personal mindfulness, and emotional support. " +
+            "If a user attempts to pivot to unrelated topics (such as coding, programming, math, pop culture, politics, trivia, cooking recipes, or general tech support), politely, warmly, and firmly decline to answer. " +
+            "Refusal Example: 'I'm SereneAI, your mindful companion, and I'm dedicated exclusively to supporting your emotional well-being and mental health. I'd love to stay focused on how you're feeling today—would you like to talk about what's on your mind?' " +
+            "Never break character, never give medical diagnoses, and never answer non-mental health questions.";
 
     @Transactional
     public ConversationResponse sendMessage(UserPrincipal userPrincipal, ChatRequest request) {
@@ -36,7 +41,7 @@ public class ChatService {
         // ၁။ Conversation ရှိမရှိ စစ်ဆေးခြင်း သို့မဟုတ် အသစ်ဖန်တီးခြင်း
         if (request.getConversationId() == null) {
             String initialTitle = request.getMessage().length() > 30
-                    ? request.getMessage().substring(0, 30) + "..."
+                    ? request.getMessage().substring(0, 25) + "..."
                     : request.getMessage();
 
             conversation = conversationRepository.save(
@@ -110,6 +115,26 @@ public class ChatService {
                                                 .timestamp(m.getTimestamp())
                                                 .build()).toList()
                         )
+                        .build())
+                .toList();
+    }
+
+    public List<MessageResponse> getMessagesByConversationId(Long conversationId, UserPrincipal userPrincipal) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found"));
+
+        // အသုံးပြုသူသည် ၎င်းတို့၏ conversation ကိုသာ ကြည့်ခွင့်ရှိကြောင်း လုံခြုံရေးစစ်ဆေးခြင်း
+        if (!conversation.getUserId().equals(userPrincipal.getId())) {
+            throw new RuntimeException("Unauthorized access to conversation");
+        }
+
+        return messageRepository.findByConversationIdOrderByTimestampAsc(conversationId)
+                .stream()
+                .map(m -> MessageResponse.builder()
+                        .id(m.getId())
+                        .sender(m.getSender())
+                        .content(m.getContent())
+                        .timestamp(m.getTimestamp())
                         .build())
                 .toList();
     }
