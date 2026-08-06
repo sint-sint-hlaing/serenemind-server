@@ -1,6 +1,7 @@
 package com.mental.dto.Notification;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -16,4 +17,8 @@ public class NotificationRequest {
 
     @NotBlank(message = "Type is required")
     private String type; // LIKE, COMMENT, REMINDER, SYSTEM, GOAL
+
+    String target;
+    @NotNull(message = "User ID is required")
+    Long userId;
 }

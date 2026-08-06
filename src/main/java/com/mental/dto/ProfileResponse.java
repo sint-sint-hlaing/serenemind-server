@@ -1,17 +1,28 @@
 package com.mental.dto;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Builder;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
-@Getter
-@Setter
-public class ProfileResponse {
-    private String username;
-    private String email;
-    private String fullname;
-    private String avatar;
-    private LocalDate birthday;
-    private int profileCompletionPercentage;
+@Builder
+public record ProfileResponse(
+
+        Long id,
+
+        String fullname,
+
+        LocalDate birthday,
+
+        String profileImageUrl,
+
+        Long avatarId,
+
+        String avatarUrl,
+
+        LocalDateTime createdAt,
+
+        LocalDateTime updatedAt
+
+) {
 }

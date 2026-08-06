@@ -1,49 +1,109 @@
 package com.mental.service;
 
-import com.mental.dto.ActionItem;
-import com.mental.dto.DashboardResponse;
-import com.mental.dto.WeeklyData;
+import com.mental.dto.home.*;
+import com.mental.dto.mood.WeeklyMoodResponse;
+import com.mental.exception.ResourceNotFoundException;
+import com.mental.mapper.DashboardMapper;
 import com.mental.model.entity.MoodEntry;
 import com.mental.model.entity.User;
+import com.mental.model.entity.enums.MoodType;
+import com.mental.repository.MoodTrackingRepository;
 import com.mental.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.ZoneId; // Required import
+import java.time.*;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
+
     private final UserRepository userRepository;
+    private final MoodTrackingRepository moodRepository;
+    private final DashboardMapper dashboardMapper;
 
-    public DashboardResponse getDashboardData(String username) {
-        User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+    public DashboardResponse getDashboardData(String email) {
+        log.debug("Fetching dashboard data for user: {}", email);
 
-        List<MoodEntry> moodEntries = user.getMoods();
-        MoodEntry latestMood = moodEntries.isEmpty() ? null : moodEntries.get(moodEntries.size() - 1);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Fixed mapping logic
-        List<WeeklyData> weeklyDataList = moodEntries.stream()
-                .map(m -> new WeeklyData(
-                        m.getCreatedAt().atZone(ZoneId.systemDefault()).getDayOfWeek().name(),
-                        (float) m.getIntensity()
-                ))
-                .collect(Collectors.toList());
+        return DashboardResponse.builder()
+                .username(user.getUsername())
+                .greeting(getGreeting())
+                .date(LocalDate.now())
+                .todayMood(getTodayMood(user))
+                .weeklyOverview(getWeeklyMood(user))
+                .quickActions(getQuickActions())
+                .currentStreak(user.getCurrentStreak())
+                .isNewBest(user.getCurrentStreak() >= user.getLongestStreak())
+                .build();
+    }
 
-        // 👈 စံချိန်ဟောင်းထက် ကျော်မကျော် တွက်ချက်ခြင်း (0 ထက်ကြီးမှ စစ်ရန်)
-        boolean isNewBest = user.getCurrentStreak() > 0 && user.getCurrentStreak() >= user.getLongestStreak();
+    private TodayMoodResponse getTodayMood(User user) {
+        MoodEntry latest = moodRepository
+                .findTopByUserOrderByCreatedAtDesc(user)
+                .orElse(null);
 
-        return new DashboardResponse(
-                user.getUsername(),
-                latestMood != null ? latestMood.getMood().name() : "None",
-                latestMood != null ? latestMood.getIntensity() * 10 : 0,
-                weeklyDataList,
-                List.of(new ActionItem("Journal", "icon_url"), new ActionItem("Meditate", "icon_url")),
-                user.getCurrentStreak(), // 👈 ထည့်သွင်းရန်
-                isNewBest                // 👈 ထည့်သွင်းရန်
+        if (latest == null) {
+            return TodayMoodResponse.builder()
+                    .mood(MoodType.NEUTRAL)
+                    .percentage(MoodType.NEUTRAL.getPercentage())
+                    .message(MoodType.NEUTRAL.getMessage())
+                    .build();
+        }
+
+        return TodayMoodResponse.builder()
+                .mood(latest.getMood())
+                .percentage(latest.getMood().getPercentage())
+                .message(latest.getMood().getMessage())
+                .build();
+    }
+
+    private List<WeeklyMoodResponse> getWeeklyMood(User user) {
+        List<WeeklyMoodResponse> result = new ArrayList<>();
+        LocalDate today = LocalDate.now();
+
+        for (DayOfWeek day : DayOfWeek.values()) {
+            LocalDate date = today.with(day);
+
+            // If the date is in the future, skip or set to 0
+            if (date.isAfter(today)) {
+                continue;
+            }
+
+            int percentage = moodRepository
+                    .findTopByUserAndDateOrderByCreatedAtDesc(user, date)
+                    .map(mood -> mood.getMood().getPercentage())
+                    .orElse(0);
+
+            result.add(WeeklyMoodResponse.builder()
+                    .day(day)
+                    .percentage(percentage)
+                    .build());
+        }
+
+        return result;
+    }
+
+    private String getGreeting() {
+        int hour = LocalTime.now().getHour();
+
+        if (hour < 12) return "Good Morning";
+        if (hour < 17) return "Good Afternoon";
+        return "Good Evening";
+    }
+
+    private List<QuickActionResponse> getQuickActions() {
+        return List.of(
+                new QuickActionResponse("Journal", "📓", "journal"),
+                new QuickActionResponse("Meditation", "🧘", "meditation"),
+                new QuickActionResponse("Goals", "🎯", "goal"),
+                new QuickActionResponse("Breathing", "🌬️", "breathing")
         );
     }
 }

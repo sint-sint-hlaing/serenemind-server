@@ -3,6 +3,7 @@ package com.mental.security;
 import com.mental.model.entity.User;
 import com.mental.repository.UserRepository;
 import com.mental.service.JwtService;
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,13 +22,8 @@ import java.io.IOException;
 public class JwtFilter
         extends OncePerRequestFilter {
 
-
     private final JwtService jwt;
-
-
     private final UserRepository repo;
-
-
 
     @Override
     protected void doFilterInternal(
@@ -37,56 +33,47 @@ public class JwtFilter
 
             throws IOException,ServletException{
 
-
         String header =
                 req.getHeader("Authorization");
-
 
         if(header!=null &&
                 header.startsWith("Bearer ")) {
 
-
             String token =
                     header.substring(7);
 
+            try {
+                String email =
+                        jwt.extractEmail(token);
 
-            String email =
-                    jwt.extractEmail(token);
+                User user =
+                        repo.findByEmail(email)
+                                .orElse(null);
 
+                if(user!=null){
 
-            User user =
-                    repo.findByEmail(email)
-                            .orElse(null);
+                    UserPrincipal principal =
+                            new UserPrincipal(user);
 
+                    Authentication auth =
+                            new UsernamePasswordAuthenticationToken(
+                                    principal,
+                                    null,
+                                    principal.getAuthorities()
+                            );
 
-            if(user!=null){
+                    SecurityContextHolder
+                            .getContext()
+                            .setAuthentication(auth);
 
-
-                UserPrincipal principal =
-                        new UserPrincipal(user);
-
-
-
-                Authentication auth =
-                        new UsernamePasswordAuthenticationToken(
-                                principal,
-                                null,
-                                principal.getAuthorities()
-                        );
-
-
-
-                SecurityContextHolder
-                        .getContext()
-                        .setAuthentication(auth);
-
+                }
+            } catch (ExpiredJwtException e) {
+                res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                res.setContentType("application/json");
+                res.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"JWT Token has expired\"}");
+                return;
             }
-
         }
-
-
         chain.doFilter(req,res);
-
     }
-
 }

@@ -14,6 +14,8 @@ public class ReminderRequest {
     @NotBlank(message = "Repeat configuration is required")
     private String repeatType; // e.g., "Daily", "Mon, Wed, Fri"
 
+    private String repeatDays;
+
     @NotNull(message = "Time is required")
     private LocalTime reminderTime; // e.g., 09:00 AM
 

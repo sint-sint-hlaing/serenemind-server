@@ -27,6 +27,10 @@ public class Reminder {
     @Column(nullable = false)
     private String repeatType;
 
+    // 👈 နေ့ရက်များကို စာသားအဖြစ် သိမ်းရန် ဤနေရာတွင် ထည့်ပါ (ဥပမာ - "MONDAY,FRIDAY")
+    // null ဖြစ်ခွင့်ပေးထားပါတယ် (ONCE သို့မဟုတ် DAILY သမားတွေဆိုရင် ထည့်စရာမလိုလို့ပါ)
+    private String repeatDays;
+
     @Column(nullable = false)
     private LocalTime reminderTime;
 

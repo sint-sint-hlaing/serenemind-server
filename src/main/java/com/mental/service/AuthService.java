@@ -19,11 +19,13 @@ public class AuthService {
 
     private final PasswordEncoder encoder;
 
+    private final FcmTokenService fcmTokenService;
+
     private final JwtService jwtService;
 
     private final RefreshTokenService refreshTokenService;
 
-
+/*
     public AuthResponse register(RegisterRequest req) {
 
         User user = new User();
@@ -45,25 +47,54 @@ public class AuthService {
         String refresh = refreshTokenService.createToken(user);
 
         return new AuthResponse(access, refresh);
-    }
+    }*/
+public AuthResponse register(RegisterRequest req) {
+
+    User user = new User();
+    user.setUsername(req.username());
+    user.setEmail(req.email());
+    user.setPasswordHash(encoder.encode(req.password()));
+    user.setRole(Role.USER);
+    user.setActive(true); // လိုအပ်ပါက true ပေးရန်
+
+    // 🔴 UserProfile ကို တည်ဆောက်ပြီး Request မှ Data များ ထည့်ခြင်း
+    UserProfile profile = new UserProfile();
+    profile.setUser(user);
+    //profile.setAvatar("avatar-1");
+   // profile.setFullname(req.fullname()); // 👈 Request ထဲက fullname ကို ထည့်ခြင်း
+    //profile.setBirthday(req.birthday()); // 👈 Request ထဲက birthday ကို ထည့်ခြင်း
+
+    user.setProfile(profile); // User ထဲသို့ Profile ထည့်သွင်းခြင်း
+
+    users.save(user); // CascadeType.ALL ကြောင့် UserProfile ပါ အလိုအလျောက် Database ထဲ ဝင်သွားပါမည်
+
+    String access = jwtService.generate(user);
+    String refresh = refreshTokenService.createToken(user);
+
+    return new AuthResponse(access, refresh);
+}
 
     public AuthResponse login(LoginRequest req) {
 
         User user = users.findByEmail(req.email())
-                .orElseThrow();
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
         if (!encoder.matches(req.password(), user.getPasswordHash())) {
             throw new RuntimeException("Invalid password");
         }
 
-        String access = jwtService.generate(user);
+        // 👈 ယူဆာ Login အောင်မြင်ပြီဖြစ်၍ ၎င်း၏ FCM Token ကို အသစ်/အဟောင်း စစ်ပြီး Database ထဲ သိမ်းဆည်းခြင်း
+        if (req.fcmToken() != null && !req.fcmToken().isBlank()) {
+            // UserPrincipal သို့မဟုတ် User Entity တိုက်ရိုက် သုံးနိုင်ရန် FcmTokenService ပေါ်မူတည်၍ ပြင်ပါ
+            // ဤနေရာတွင် User Entity ကို တိုက်ရိုက် လက်ခံသည့် Method အသစ်ဖြင့် သိမ်းခြင်းဖြစ်ပါသည်
+            fcmTokenService.saveTokenForUser(user, req.fcmToken());
+        }
 
+        String access = jwtService.generate(user);
         String refresh = refreshTokenService.createToken(user);
 
         return new AuthResponse(access, refresh);
     }
-
-
 
     public AuthResponse refresh(
             RefreshRequest request
@@ -129,4 +160,26 @@ public class AuthService {
 
     }
 
+    public AuthResponse registerAdmin(RegisterRequest req) {
+        User user = new User();
+
+        user.setUsername(req.username());
+        user.setEmail(req.email());
+        user.setPasswordHash(encoder.encode(req.password()));
+
+        // 🔴 ဤနေရာတွင် Role ကို ADMIN ဟု သတ်မှတ်ပေးပါ
+        user.setRole(Role.ADMIN);
+
+        UserProfile profile = new UserProfile();
+        profile.setUser(user);
+       // profile.setAvatar("avatar-1");
+        user.setProfile(profile);
+
+        users.save(user);
+
+        String access = jwtService.generate(user);
+        String refresh = refreshTokenService.createToken(user);
+
+        return new AuthResponse(access, refresh);
+    }
 }

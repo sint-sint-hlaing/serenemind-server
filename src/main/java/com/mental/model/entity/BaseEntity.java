@@ -3,8 +3,11 @@ package com.mental.model.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @MappedSuperclass
 @Getter
@@ -15,17 +18,29 @@ public abstract class BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Instant createdAt;
-    private Instant updatedAt;
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @PrePersist
-    public void onCreate() {
-        createdAt = Instant.now();
-        updatedAt = Instant.now();
+    @UpdateTimestamp
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    // ===== Convenience Methods =====
+
+    public Instant getCreatedAtAsInstant() {
+        return createdAt != null ? createdAt.toInstant(java.time.ZoneOffset.UTC) : null;
     }
 
-    @PreUpdate
-    public void onUpdate() {
-        updatedAt = Instant.now();
+    public Instant getUpdatedAtAsInstant() {
+        return updatedAt != null ? updatedAt.toInstant(java.time.ZoneOffset.UTC) : null;
+    }
+
+    public LocalDateTime getCreatedAtLocalDateTime() {
+        return createdAt;
+    }
+
+    public LocalDateTime getUpdatedAtLocalDateTime() {
+        return updatedAt;
     }
 }
