@@ -207,24 +207,7 @@ public class JournalController {
         return ResponseEntity.ok(response);
     }
 
-    // ─────────────────────────────────────────────
-    // PATCH – TOGGLE PRIVATE  (Screen 6: lock / private toggle)
-    // ─────────────────────────────────────────────
 
-    /**
-     * Toggle the private (lock) flag for a journal entry.
-     * No request body required.
-     *
-     * Security review: Ownership validated ✅ | No input to sanitise ✅
-     */
-    @PatchMapping("/{id}/private")
-    public ResponseEntity<JournalResponse> togglePrivate(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserPrincipal userPrincipal) {
-
-        JournalResponse response = journalService.togglePrivate(id, userPrincipal);
-        return ResponseEntity.ok(response);
-    }
 
     // ─────────────────────────────────────────────
     // PHOTO – UPLOAD

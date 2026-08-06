@@ -10,7 +10,6 @@ public record JournalDto(
     String content,
      boolean isFlagged,
     String flagReason,
-     boolean isPrivate,
      LocalDateTime createdAt,
      Long userId
 

@@ -5,7 +5,9 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "journals")
+@Table(name = "journals", indexes = {
+    @Index(name = "idx_journals_user_created", columnList = "user_id, created_at DESC")
+})
 @Getter
 @Setter
 public class Journal extends BaseEntity {
@@ -25,9 +27,7 @@ public class Journal extends BaseEntity {
     @Column(nullable = false)
     private boolean favourite = false;
 
-    /** Whether journal is private (locked) – hidden in community/admin views */
-    @Column(nullable = false)
-    private boolean isPrivate = false;
+
 
     /** Comma-separated list of user-defined tags e.g. "gratitude,family" */
     @Column(length = 512)

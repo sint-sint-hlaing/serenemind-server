@@ -48,8 +48,8 @@ public class JournalService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${gemini.api.key:}")
-    private String geminiApiKey;
+    @Value("${groq.api.key:}")
+    private String groqApiKey;
 
     /** Allowed MIME types for photo uploads. */
     private static final Set<String> ALLOWED_MIME_TYPES =
@@ -80,7 +80,6 @@ public class JournalService {
         journal.setEncryptedText(encryptedContent);
         journal.setUser(user);
         journal.setFavourite(request.isFavourite());
-        journal.setPrivate(request.isPrivate());
         // photoUrl intentionally NOT set here — use POST /api/journals/{id}/photo
         journal.setTags(tagsToString(request.getTags()));
 
@@ -147,7 +146,19 @@ public class JournalService {
     @Transactional(readOnly = true)
     public List<JournalResponse> searchJournals(UserPrincipal userPrincipal, String query) {
         User user = resolveUser(userPrincipal);
-        return journalRepository.searchByUserAndTitle(user, query).stream()
+        String trimmedQuery = query != null ? query.trim() : "";
+
+        List<Journal> results;
+        if (trimmedQuery.startsWith("#")) {
+            // Strip the leading '#' symbol and search only by tags
+            String tagQuery = trimmedQuery.substring(1).trim();
+            results = journalRepository.searchByUserAndTagOnly(user, tagQuery);
+        } else {
+            // Search across both title and tags (case-insensitive)
+            results = journalRepository.searchByUserAndTitleOrTag(user, trimmedQuery);
+        }
+
+        return results.stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -170,7 +181,6 @@ public class JournalService {
         journal.setTitle(request.getTitle());
         journal.setEncryptedText(encryptionUtil.encrypt(request.getContent()));
         journal.setTags(tagsToString(request.getTags()));
-        journal.setPrivate(request.isPrivate());
         journal.setFavourite(request.isFavourite());
         // photoUrl NOT updated here — managed exclusively via the photo endpoint
 
@@ -192,20 +202,7 @@ public class JournalService {
         return convertToResponse(journalRepository.save(journal));
     }
 
-    // ─────────────────────────────────────────────
-    // UPDATE – TOGGLE PRIVATE
-    // ─────────────────────────────────────────────
 
-    /**
-     * PATCH /api/journals/{id}/private
-     * Toggle the private (lock) flag on a journal entry.
-     */
-    @Transactional
-    public JournalResponse togglePrivate(Long id, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(id, userPrincipal);
-        journal.setPrivate(!journal.isPrivate());
-        return convertToResponse(journalRepository.save(journal));
-    }
 
     // ─────────────────────────────────────────────
     // DELETE
@@ -366,58 +363,48 @@ public class JournalService {
 
         boolean success = false;
 
-        // Try calling the Gemini API for live analysis
-        if (geminiApiKey != null && !geminiApiKey.isBlank()) {
-            try {
-                String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=" + geminiApiKey;
+        // ⚠️ SECURITY FLAG: This endpoint has no rate limit.
+        //    Add @RateLimiter or a Bucket4j filter before production deployment.
+        //    Risk: Medium — a malicious user could spam AI analysis calls.
 
-                String prompt = "Analyze the following mental health journal entry. " +
-                        "Evaluate: \n" +
-                        "1. emotion: One-word primary emotion (e.g. Calm, Happy, Anxious, Sad, Angry, Neutral)\n" +
-                        "2. sentiment: POSITIVE, NEGATIVE, or NEUTRAL\n" +
-                        "3. stressScore: A numeric stress level score from 0 to 100\n" +
-                        "4. keyThemes: An array of 2 to 3 tags describing the core themes (e.g. Gratitude, Family, Health, Work, Positivity)\n" +
-                        "5. aiResponse: A supportive and empathetic reflection paragraph (2-3 sentences max)\n" +
-                        "6. aiSuggestion: A helpful and actionable suggestion (1-2 sentences max) based on the user's emotion.\n\n" +
+        // Try calling the Groq API for live analysis
+        if (groqApiKey != null && !groqApiKey.isBlank()) {
+            try {
+                String url = "https://api.groq.com/openai/v1/chat/completions";
+
+                String prompt = "Analyze the following mental health journal entry.\n\n" +
+                        "Respond ONLY with a raw JSON object containing exactly these keys:\n" +
+                        "- emotion: One-word primary emotion (e.g. Calm, Happy, Anxious, Sad, Angry, Neutral)\n" +
+                        "- sentiment: POSITIVE, NEGATIVE, or NEUTRAL\n" +
+                        "- stressScore: A numeric stress level score from 0 to 100\n" +
+                        "- keyThemes: An array of 2 to 3 strings describing the core themes (e.g. [\"Work\", \"Stress\", \"Family\"])\n" +
+                        "- aiResponse: A supportive and empathetic reflection paragraph (2-3 sentences max)\n" +
+                        "- aiSuggestion: A helpful and actionable suggestion (1-2 sentences max)\n\n" +
                         "Journal entry content:\n" + plainText;
 
-                Map<String, Object> textPart = Map.of("text", prompt);
-                Map<String, Object> parts = Map.of("parts", List.of(textPart));
-                Map<String, Object> contents = Map.of("contents", List.of(parts));
-
-                // Define JSON Schema for Structured Output to guarantee JSON matching our entity properties
-                Map<String, Object> schema = Map.of(
-                        "type", "OBJECT",
-                        "properties", Map.of(
-                                "emotion", Map.of("type", "STRING", "description", "One word primary emotion, e.g., Calm, Happy, Anxious, Sad, Angry, Neutral"),
-                                "sentiment", Map.of("type", "STRING", "description", "POSITIVE, NEGATIVE, or NEUTRAL"),
-                                "stressScore", Map.of("type", "INTEGER", "description", "Stress level score from 0 to 100"),
-                                "keyThemes", Map.of("type", "ARRAY", "items", Map.of("type", "STRING"), "description", "2 to 3 tags describing themes, e.g. Gratitude, Family, Health, Work, Positivity"),
-                                "aiResponse", Map.of("type", "STRING", "description", "A supportive reflection paragraph (2-3 sentences)"),
-                                "aiSuggestion", Map.of("type", "STRING", "description", "One actionable suggestion (1-2 sentences)")
-                        ),
-                        "required", List.of("emotion", "sentiment", "stressScore", "keyThemes", "aiResponse", "aiSuggestion")
+                Map<String, Object> systemMessage = Map.of(
+                        "role", "system",
+                        "content", "You are a compassionate mental health AI assistant. Always respond strictly with valid JSON only — no markdown, no extra text."
                 );
-
-                Map<String, Object> generationConfig = Map.of(
-                        "responseMimeType", "application/json",
-                        "responseSchema", schema
-                );
+                Map<String, Object> userMessage = Map.of("role", "user", "content", prompt);
 
                 Map<String, Object> requestBody = Map.of(
-                        "contents", List.of(parts),
-                        "generationConfig", generationConfig
+                        "model", "llama-3.3-70b-versatile",
+                        "messages", List.of(systemMessage, userMessage),
+                        "response_format", Map.of("type", "json_object")
                 );
 
                 HttpHeaders headers = new HttpHeaders();
                 headers.setContentType(MediaType.APPLICATION_JSON);
+                headers.setBearerAuth(groqApiKey);
 
                 HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
                 ResponseEntity<String> response = restTemplate.postForEntity(url, requestEntity, String.class);
 
                 if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                     JsonNode root = objectMapper.readTree(response.getBody());
-                    String jsonText = root.path("candidates").get(0).path("content").path("parts").get(0).path("text").asText();
+                    // Groq returns: choices[0].message.content (plain JSON string)
+                    String jsonText = root.path("choices").get(0).path("message").path("content").asText();
 
                     JsonNode resultNode = objectMapper.readTree(jsonText);
 
@@ -436,8 +423,8 @@ public class JournalService {
                     success = true;
                 }
             } catch (Exception e) {
-                // Non-blocking error logging (System.err/logger fallback)
-                System.err.println("Error calling Gemini API: " + e.getMessage());
+                // Non-blocking error logging — fallback to mock analysis below
+                System.err.println("Error calling Groq API: " + e.getMessage());
             }
         }
 
@@ -502,7 +489,6 @@ public class JournalService {
 
         response.setTags(stringToTags(journal.getTags()));
         response.setFavourite(journal.isFavourite());
-        response.setPrivate(journal.isPrivate());
         response.setPhotoUrl(journal.getPhotoUrl());
         response.setCreatedAt(journal.getCreatedAt());
         response.setUpdatedAt(journal.getUpdatedAt());
@@ -532,7 +518,11 @@ public class JournalService {
     // Tag helpers
     private String tagsToString(List<String> tags) {
         if (tags == null || tags.isEmpty()) return null;
-        return String.join(",", tags);
+        return tags.stream()
+                .map(String::trim)
+                .map(tag -> tag.startsWith("#") ? tag.substring(1).trim() : tag)
+                .filter(tag -> !tag.isEmpty())
+                .collect(Collectors.joining(","));
     }
 
     private List<String> stringToTags(String tags) {

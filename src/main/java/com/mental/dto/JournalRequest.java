@@ -36,11 +36,10 @@ public class JournalRequest {
     private List<
         @NotBlank(message = "Tag must not be blank")
         @Size(max = 50, message = "Each tag must not exceed 50 characters")
-        @Pattern(regexp = "^[\\w\\s\\-]+$", message = "Tags may only contain letters, numbers, spaces and hyphens")
+        @Pattern(regexp = "^#?[\\w\\s\\-]+$", message = "Tags may only contain letters, numbers, spaces and hyphens, and optionally start with #")
         String> tags;
 
-    /** Whether this journal entry is marked private / locked */
-    private boolean isPrivate;
+
 
     /** Whether this journal is marked as favourite */
     private boolean favourite;

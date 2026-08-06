@@ -22,8 +22,7 @@ public class JournalResponse {
     /** True if user marked this as a favourite */
     private boolean favourite;
 
-    /** True if this journal is private / locked */
-    private boolean isPrivate;
+
 
     /** Optional attached photo URL */
     private String photoUrl;
