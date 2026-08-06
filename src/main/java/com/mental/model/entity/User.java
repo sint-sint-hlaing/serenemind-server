@@ -16,7 +16,9 @@ import java.util.List;
 @Entity
 @Table(name = "users")
 @Getter
-@Setter
+@Setter@AllArgsConstructor
+
+@NoArgsConstructor
 public class User extends BaseEntity {
 
     @Column(nullable = false, unique = true)
@@ -24,6 +26,12 @@ public class User extends BaseEntity {
 
     @Column(nullable = false, unique = true)
     private String email;
+
+    @Column(nullable = false)
+    private String bio;
+
+    @Column(nullable = false)
+    private String location;
 
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
@@ -34,6 +42,9 @@ public class User extends BaseEntity {
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private UserProfile profile;
 
+    @OneToOne(cascade = CascadeType.ALL)
+    private Avatar avatar;
+    
     private boolean isActive;
 
     // 👈 Streak ဆိုင်ရာ Field များ

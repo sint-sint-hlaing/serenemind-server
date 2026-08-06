@@ -1,7 +1,9 @@
 package com.mental.dto.mood;
 
+import com.mental.model.entity.enums.MoodType;
+
 public record MoodDistributionDto(
-        String moodType,
+        MoodType mood,
         long count,
         double percentage
 ) {

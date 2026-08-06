@@ -28,7 +28,7 @@ public class AuditLog {
     private Long targetId;
 
     @Column(columnDefinition = "TEXT")
-    private String details;
+    private String description;
 
     @CreationTimestamp
     @Column(updatable = false)

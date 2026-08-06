@@ -5,6 +5,8 @@ import com.mental.dto.ProfileResponse;
 import com.mental.dto.UpdateProfileRequest;
 import com.mental.dto.user.PersonalInformationResponse;
 import com.mental.dto.user.UserActivityResponse;
+
+import com.mental.dto.*;
 import com.mental.security.UserPrincipal;
 import com.mental.service.UserProfileService;
 import jakarta.validation.Valid;
@@ -37,6 +39,7 @@ public class UserProfileController {
         return ResponseEntity.ok(response);
     }
 
+
     @GetMapping("/activity")
     public ResponseEntity<UserActivityResponse> getUserActivity(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -52,4 +55,8 @@ public class UserProfileController {
         PersonalInformationResponse response = userProfileService.getPersonalInformation(userPrincipal.getEmail());
         return ResponseEntity.ok(response);
     }
+
+
+
+
 }

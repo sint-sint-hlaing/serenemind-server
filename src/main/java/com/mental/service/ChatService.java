@@ -109,7 +109,7 @@ public class ChatService {
         return ConversationResponse.builder()
                 .id(conversation.getId())
                 .title(conversation.getTitle())
-                .createdAt(conversation.getCreatedAt())
+                .createdAt(conversation.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant())
                 .messages(messageResponses)
                 .build();
     }
@@ -123,17 +123,18 @@ public class ChatService {
 
                     // Message ၏ timestamp ကို မသုံးဘဲ Conversation ၏ createdAt (သို့မဟုတ် မက်ဆေ့ချ်များထဲမှ အသစ်ဆုံး createdAt) ကို ယူခြင်း
                     Instant lastActivityTime = messages.stream()
-                            .map(BaseEntity::getCreatedAt) // Message သည် BaseEntity ကို inheritance လုပ်ထားသဖြင့် createdAt ကို ယူနိုင်သည်
+                            .map(BaseEntity::getCreatedAt)
                             .filter(java.util.Objects::nonNull)
-                            .max(Instant::compareTo)
-                            .orElse(conv.getCreatedAt());
+                            .map(dateTime -> dateTime.atZone(java.time.ZoneId.systemDefault()).toInstant()) // LocalDateTime ကို Instant သို့ ပြောင်းခြင်း
+                            .max(java.util.Comparator.naturalOrder())
+                            .orElse(conv.getCreatedAt() != null ? conv.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant() : null);
 
                     List<MessageResponse> messageResponses = messages.stream()
                             .map(m -> MessageResponse.builder()
                                     .id(m.getId())
                                     .sender(m.getSender())
                                     .content(m.getContent())
-                                    .timestamp(m.getCreatedAt() != null ? LocalDateTime.ofInstant(m.getCreatedAt(), java.time.ZoneId.systemDefault()) : null)
+                                    .timestamp(m.getCreatedAt())
                                     .build())
                             .toList();
 
@@ -142,7 +143,7 @@ public class ChatService {
                             ConversationResponse.builder()
                                     .id(conv.getId())
                                     .title(conv.getTitle())
-                                    .createdAt(conv.getCreatedAt())
+                                    .createdAt(conv.getCreatedAt().atZone(java.time.ZoneId.systemDefault()).toInstant())
                                     .messages(messageResponses)
                                     .build()
                     };

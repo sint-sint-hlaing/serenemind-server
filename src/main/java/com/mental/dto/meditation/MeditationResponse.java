@@ -10,6 +10,8 @@ public record MeditationResponse(
         String category,
         String duration,
         String audioUrl,
-        String imageUrl
+        String imageUrl,
+        boolean favorite
+
 ) {
 }

@@ -43,6 +43,9 @@ public class Meditation extends BaseEntity {
 
     @Column(nullable = false)
     private Long listenCount = 0L;
+    private boolean completed;
+
+
 
     @Column(nullable=false)
     private Integer durationSeconds;
