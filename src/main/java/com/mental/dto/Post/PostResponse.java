@@ -21,4 +21,5 @@ public class PostResponse {
     private String username;
     private String userProfilePicture;
     private boolean isLikedByMe;
+    private boolean isSavedByMe;
 }

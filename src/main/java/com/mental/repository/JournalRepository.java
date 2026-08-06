@@ -42,6 +42,9 @@ public interface JournalRepository extends JpaRepository<Journal, Long> {
 
     long countByUser(User user);
 
+
+    long countByUserId(Long userId);
+
    
 
     @Query(value = """
@@ -78,3 +81,4 @@ WHERE DATE(j.createdAt)=CURRENT_DATE
 
     long countByCreatedAtBetween(LocalDateTime localDateTime, LocalDateTime now);
 }
+

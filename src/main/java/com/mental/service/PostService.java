@@ -2,16 +2,11 @@ package com.mental.service;
 
 import com.mental.dto.Post.PostRequest;
 import com.mental.dto.Post.PostResponse;
-import com.mental.model.entity.Post;
-import com.mental.model.entity.User;
-import com.mental.model.entity.PostLike;
-import com.mental.model.entity.Notification; // 👈 Notification Entity ကို import လုပ်ပါ
-import com.mental.repository.PostLikeRepository;
-import com.mental.repository.PostRepository;
-import com.mental.repository.UserRepository;
-import com.mental.repository.NotificationRepository; // 👈 NotificationRepository ကို import လုပ်ပါ
+import com.mental.model.entity.*;
+import com.mental.repository.*;
 import com.mental.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +27,8 @@ public class PostService {
     private final CloudinaryService cloudinaryService;
     private final StreakService streakService;
     private final NotificationService notificationService;
-    private final NotificationRepository notificationRepository; // 👈 NotificationRepository ကို Inject လုပ်ပေးထားသည်
-
+    private final NotificationRepository notificationRepository;
+    private final PostSaveRepository postSaveRepository;
     // UI - Community Feed (Recent သို့မဟုတ် Popular အလိုက် ဆွဲထုတ်ခြင်း)
     @Transactional(readOnly = true)
     public List<PostResponse> getAllPosts(UserPrincipal userPrincipal, String filter) {
@@ -82,6 +77,26 @@ public class PostService {
         return convertToPostResponse(savedPost, user);
     }
 
+    @Transactional
+    public void deletePost(Long id, UserPrincipal userPrincipal) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + id));
+
+        User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        // Check if the current user is the owner of the post
+        if (!post.getUser().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("You do not have permission to delete this post");
+        }
+
+        // Delete associated likes and saves first if cascading is not set at DB level
+        postLikeRepository.deleteByPostId(id); // Ensure this exists in PostLikeRepository if needed
+        postSaveRepository.deleteByPostId(id); // Ensure this exists in PostSaveRepository if needed
+
+        postRepository.delete(post);
+    }
+
     // UI - Post တစ်ခုကို Like ပေးခြင်း / ပြန်ဖြုတ်ခြင်း (Toggle)
     @Transactional
     public void toggleLikePost(Long id, UserPrincipal userPrincipal) {
@@ -126,9 +141,44 @@ public class PostService {
         postRepository.save(post);
     }
 
-    // Helper Method: Entity မှ Response DTO သို့ ပြောင်းလဲခြင်း
+    @Transactional
+    public void toggleSavePost(Long id, UserPrincipal userPrincipal) {
+        Post post = postRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + id));
+
+        User user = userRepository.findByEmail(userPrincipal.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        postSaveRepository.findByPostIdAndUserId(id, user.getId())
+                .ifPresentOrElse(
+                        postSaveRepository::delete, // Save ထားပြီးသားဖြစ်ပါက ပြန်ဖျက်မည်
+                        () -> {
+                            PostSave newSave = PostSave.builder()
+                                    .post(post)
+                                    .user(user)
+                                    .build();
+                            postSaveRepository.save(newSave); // Save မထားရသေးပါက သိမ်းမည်
+                        }
+                );
+    }
+
+    // UI - မိမိ Save လုပ်ထားသော Post များအားလုံးကို ပြန်ကြည့်ခြင်း
+    @Transactional(readOnly = true)
+    public List<PostResponse> getSavedPosts(UserPrincipal userPrincipal) {
+        User user = userRepository.findByEmail(userPrincipal.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        List<PostSave> savedPosts = postSaveRepository.findAllByUserIdOrderByPostCreatedAtDesc(user.getId());
+
+        return savedPosts.stream()
+                .map(save -> convertToPostResponse(save.getPost(), user))
+                .collect(Collectors.toList());
+    }
+
+    // convertToPostResponse Helper Method ထဲတွင် isSavedByMe ပါ ထည့်ပေးရန်
     private PostResponse convertToPostResponse(Post post, User currentUser) {
         boolean isLiked = postLikeRepository.existsByPostIdAndUserId(post.getId(), currentUser.getId());
+        boolean isSaved = postSaveRepository.existsByPostIdAndUserId(post.getId(), currentUser.getId()); // 👈 စစ်ဆေးရန်
 
         PostResponse response = new PostResponse();
         response.setId(post.getId());
@@ -137,6 +187,7 @@ public class PostService {
         response.setLikeCount(post.getLikeCount());
         response.setCommentCount(post.getCommentCount());
         response.setLikedByMe(isLiked);
+        response.setSavedByMe(isSaved); // 👈 Set လုပ်ပေးရန်
         response.setCreatedAt(post.getCreatedAt());
         response.setAnonymous(post.isAnonymous());
 
@@ -149,7 +200,7 @@ public class PostService {
             response.setUserProfilePicture(null);
         } else {
             String profilePic = (post.getUser().getUserProfile() != null)
-                    ? post.getUser().getUserProfile().getProfileImageUrl()
+                    ? post.getUser().getUserProfile().getAvatar()
                     : null;
             response.setUsername(post.getUser().getUsername());
             response.setUserProfilePicture(profilePic);

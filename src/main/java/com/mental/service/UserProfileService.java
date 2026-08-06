@@ -1,8 +1,18 @@
 package com.mental.service;
 
+
+import com.mental.dto.user.PersonalInformationResponse;
+import com.mental.dto.ProfileResponse;
+import com.mental.dto.UpdateProfileRequest;
+import com.mental.dto.user.UserActivityResponse;
+import com.mental.model.entity.User;
+import com.mental.model.entity.UserProfile;
+import com.mental.model.entity.enums.GoalStatus;
+import com.mental.repository.*;
+import com.mental.security.UserPrincipal;
+
 import com.mental.dto.*;
 import com.mental.exception.ResourceNotFoundException;
-import com.mental.mapper.ProfileMapper;
 import com.mental.mapper.UserMapper;
 import com.mental.model.entity.Avatar;
 import com.mental.model.entity.User;
@@ -12,6 +22,7 @@ import com.mental.repository.UserProfileRepository;
 import com.mental.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,33 +36,47 @@ public class UserProfileService {
 
 
     private final UserProfileRepository userProfileRepository;
+    private final JournalRepository journalRepository;
+    private final UserGoalRepository userGoalRepository;
+    private final PostRepository postRepository;
+    private final CloudinaryService cloudinaryService;
     private final UserRepository userRepository;
-    private final AvatarRepository avatarRepository;
-    private final ProfileMapper profileMapper;
-    private final ImageService imageService;
     private final UserMapper userMapper;
 
-
-
     @Transactional(readOnly = true)
-    public ProfileResponse getProfile(String email) {
+    public UserActivityResponse getUserActivity(UserPrincipal userPrincipal) {
+        User user = userRepository.findByEmail(userPrincipal.getEmail())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        UserProfile profile = getUserProfile(email);
+        long journalCount = journalRepository.countByUserId(user.getId());
+        long completedGoalsCount = userGoalRepository.countByUserIdAndStatus(user.getId(), GoalStatus.COMPLETED);
+        long postCount = postRepository.countByUserId(user.getId());
 
-        return profileMapper.toResponse(profile);
+        return UserActivityResponse.builder()
+                .totalJournals(journalCount)
+                .goalsCompleted(completedGoalsCount)
+                .totalPosts(postCount)
+                .build();
     }
 
 
+    @Transactional
+    public ProfileResponse updateProfile(String email, UpdateProfileRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-    public ProfileResponse updateProfile(
-            String email,
-            UpdateProfileRequest request
-    ) {
+
+        // 1. Update Username if provided and changed
+        if (request.getUsername() != null && !request.getUsername().isBlank()) {
+            user.setUsername(request.getUsername());
+            userRepository.save(user);
+        }
+
 
         UserProfile profile = getUserProfile(email);
 
 
-        if(request.getFullname() != null &&
+        if (request.getFullname() != null &&
                 !request.getFullname().isBlank()) {
 
             profile.setFullname(
@@ -60,7 +85,7 @@ public class UserProfileService {
         }
 
 
-        if(request.getBirthday() != null) {
+        if (request.getBirthday() != null) {
 
             profile.setBirthday(
                     request.getBirthday()
@@ -68,103 +93,28 @@ public class UserProfileService {
         }
 
 
-        userProfileRepository.save(profile);
+        profile.setFullname(request.getFullname());
+        profile.setBirthday(request.getBirthday());
+        profile.setBio(request.getBio());
 
 
-        return profileMapper.toResponse(profile);
-    }
+        // 2. Handle Cloudinary Image Upload
+        if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
+            // Delete old avatar if present
+            if (profile.getAvatar() != null && !profile.getAvatar().isBlank()) {
+                cloudinaryService.deleteImage(profile.getAvatar());
+            }
 
-
-
-
-    public ImageResponse uploadProfileImage(
-            MultipartFile image
-    ) {
-
-        UserProfile profile = getCurrentProfile();
-
-
-        String imageUrl = imageService.upload(image);
-
-
-        profile.setProfileImageUrl(imageUrl);
-
-
-        return new ImageResponse(imageUrl);
-    }
-
-
-
-
-
-    public MessageResponse removeProfileImage() {
-
-        UserProfile profile = getCurrentProfile();
-
-
-        profile.setProfileImageUrl(null);
-
-
-        return MessageResponse.success(
-                "Profile image removed successfully"
-        );
-    }
-
-
-
-
-    public MessageResponse changeAvatar(
-            SelectAvatarRequest request
-    ) {
-
-        UserProfile profile = getCurrentProfile();
-
-
-
-        Avatar avatar = avatarRepository.findById(
-                        request.avatarId()
-                )
-                .orElseThrow(() ->
-                        new ResourceNotFoundException(
-                                "Avatar not found"
-                        )
-                );
-
-
-
-        if(Boolean.FALSE.equals(avatar.getIsActive())) {
-
-            throw new IllegalStateException(
-                    "Avatar is not available"
-            );
+            // Upload new image
+            String newImageUrl = cloudinaryService.uploadImage(request.getAvatar());
+            profile.setAvatar(newImageUrl);
         }
 
+        userProfileRepository.save(profile);
 
+        return getProfile(email);
 
-        profile.setAvatar(avatar);
-
-
-
-        return MessageResponse.success(
-                "Avatar changed successfully"
-        );
     }
-
-
-
-
-    private UserProfile getCurrentProfile() {
-
-        String email =
-                SecurityContextHolder
-                        .getContext()
-                        .getAuthentication()
-                        .getName();
-
-
-        return getUserProfile(email);
-    }
-
 
 
 
@@ -195,4 +145,44 @@ public class UserProfileService {
                 .map(userMapper::toAdminDto)
                 .toList();
     }
+
+
+
+@Transactional(readOnly = true)
+public PersonalInformationResponse getPersonalInformation(String email) {
+    User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + email));
+
+    UserProfile profile = user.getProfile();
+
+    return PersonalInformationResponse.builder()
+            .fullname(profile != null ? profile.getFullname() : null)
+            .email(user.getEmail())
+            .username(user.getUsername())
+            .birthday(profile != null ? profile.getBirthday() : null)
+            .accountStatus("Active") // Or pull dynamically from user entity if available: user.getStatus().name()
+            .role(user.getRole() != null ? user.getRole().name() : "User")
+            .memberSince(user.getCreatedAt())
+            .build();
+}
+
+
+    public ProfileResponse getProfile(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        // သင့် database ဆက်စပ်ပုံအပေါ်မူတည်ပြီး profile ကို ဆွဲထုတ်ပါ
+        UserProfile profile = userProfileRepository.findByUser(user)
+                .orElse(new UserProfile()); // မရှိသေးလျှင် အလွတ် object တစ်ခုပေးရန်
+
+        return ProfileResponse.builder()
+                .fullname(profile.getFullname())
+                .email(user.getEmail())
+                .avatar(profile.getAvatar())
+                .bio(profile.getBio())
+                .username(user.getUsername())
+                .birthday(profile.getBirthday())
+                .build();
     }
+}
+

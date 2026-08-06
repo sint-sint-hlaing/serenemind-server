@@ -27,25 +27,21 @@ public class UserProfile extends BaseEntity {
     )
     private User user;
 
-
-
     @Column(nullable = false)
     private String fullname;
 
 
-
     private LocalDate birthday;
 
-
+    private String bio;
 
     // User uploaded image
-    private String profileImageUrl;
-
-
+    private String avatar;
 
     // Default avatar selection
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "avatar_id")
-    private Avatar avatar;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "avatar_id")
+//    private Avatar avatar;
 
 }
+

@@ -20,7 +20,7 @@ public class UserMapper {
                 .email(user.getEmail())
                 .fullname(profile != null ? profile.getFullname() : "N/A")
                 .birthday(profile != null ? profile.getBirthday() : null)
-                .avatarUrl(profile != null ? profile.getProfileImageUrl() : null)
+                .avatarUrl(profile != null ? profile.getAvatar() : null)
                 .isActive(user.isActive())
                 .createdAt(user.getCreatedAt() ).build();
     }

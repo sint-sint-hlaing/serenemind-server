@@ -1,28 +1,21 @@
 package com.mental.dto;
 
-import lombok.Builder;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+
+@Getter
+@Setter
 @Builder
-public record ProfileResponse(
-
-        Long id,
-
-        String fullname,
-
-        LocalDate birthday,
-
-        String profileImageUrl,
-
-        Long avatarId,
-
-        String avatarUrl,
-
-        LocalDateTime createdAt,
-
-        LocalDateTime updatedAt
-
-) {
+@NoArgsConstructor
+@AllArgsConstructor
+public class ProfileResponse {
+    private String fullname;
+    private String email;
+    private String avatar;
+    private String bio;
+    private String username;
+    private LocalDate birthday;
 }

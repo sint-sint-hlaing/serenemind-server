@@ -15,6 +15,10 @@ public interface UserGoalRepository extends JpaRepository<UserGoal, Long> {
     // ===== Basic Queries =====
     List<UserGoal> findByUser(User user);
 
+
+    long countByUserIdAndStatus(Long userId, GoalStatus status);
+
+
     List<UserGoal> findByUserAndStatus(User user, GoalStatus status);
 
     List<UserGoal> findByUserAndStatusIn(User user, List<GoalStatus> statuses);
@@ -34,3 +38,4 @@ public interface UserGoalRepository extends JpaRepository<UserGoal, Long> {
 
     long countByStatus(GoalStatus goalStatus);
 }
+

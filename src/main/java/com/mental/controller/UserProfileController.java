@@ -1,5 +1,11 @@
 package com.mental.controller;
 
+
+import com.mental.dto.ProfileResponse;
+import com.mental.dto.UpdateProfileRequest;
+import com.mental.dto.user.PersonalInformationResponse;
+import com.mental.dto.user.UserActivityResponse;
+
 import com.mental.dto.*;
 import com.mental.security.UserPrincipal;
 import com.mental.service.UserProfileService;
@@ -9,7 +15,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/users")
@@ -25,34 +30,33 @@ public class UserProfileController {
         return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/me")
+    @PutMapping(value = "/me", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ProfileResponse> updateMyProfile(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
-            @Valid @RequestBody UpdateProfileRequest request) {
+            @Valid @ModelAttribute UpdateProfileRequest request) {
 
-        // Update လုပ်တဲ့နေရာမှာလည်း userPrincipal.getUsername() ကိုပဲ သုံးပါမယ်
         ProfileResponse response = userProfileService.updateProfile(userPrincipal.getEmail(), request);
         return ResponseEntity.ok(response);
     }
-    @PostMapping(value = "/me/profile-image",
-            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ImageResponse uploadProfileImage(
-            @RequestParam MultipartFile image) {
 
-        return userProfileService.uploadProfileImage(image);
+
+    @GetMapping("/activity")
+    public ResponseEntity<UserActivityResponse> getUserActivity(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        UserActivityResponse activity = userProfileService.getUserActivity(userPrincipal);
+        return ResponseEntity.ok(activity);
     }
 
-    @DeleteMapping("/me/profile-image")
-    public MessageResponse removeProfileImage() {
+    @GetMapping("/personal-info")
+    public ResponseEntity<PersonalInformationResponse> getPersonalInformation(
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
-        return userProfileService.removeProfileImage();
+        PersonalInformationResponse response = userProfileService.getPersonalInformation(userPrincipal.getEmail());
+        return ResponseEntity.ok(response);
     }
 
-    @PutMapping("/me/avatar")
-    public MessageResponse changeAvatar(
-            @RequestBody SelectAvatarRequest request) {
 
-        return userProfileService.changeAvatar(request);
-    }
+
 
 }

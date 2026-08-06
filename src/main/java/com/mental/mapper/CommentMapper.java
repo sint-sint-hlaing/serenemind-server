@@ -48,7 +48,7 @@ public class CommentMapper {
             response.setUsername(comment.getUser().getUsername());
             response.setUserProfilePicture(
                     comment.getUser().getUserProfile() != null
-                            ? comment.getUser().getUserProfile().getProfileImageUrl()
+                            ? comment.getUser().getUserProfile().getAvatar()
                             : null
             );
         }

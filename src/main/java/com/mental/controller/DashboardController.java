@@ -1,6 +1,7 @@
 package com.mental.controller;
 
 import com.mental.dto.home.DashboardResponse;
+import com.mental.dto.user.UserActivityResponse;
 import com.mental.security.UserPrincipal;
 import com.mental.service.DashboardService;
 import lombok.RequiredArgsConstructor;
@@ -27,4 +28,5 @@ public class DashboardController {
                 )
         );
     }
+
 }
