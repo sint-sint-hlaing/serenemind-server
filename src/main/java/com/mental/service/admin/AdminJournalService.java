@@ -6,9 +6,6 @@ import com.mental.dto.analysis.JournalTrendDto;
 
 import java.util.List;
 public interface AdminJournalService {
-    // Journal Management
-
-   
 
     void deleteJournal(Long id);
 

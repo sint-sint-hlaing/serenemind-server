@@ -34,8 +34,6 @@ public class MeditationMapper {
                 .id(meditation.getId())
                 .title(meditation.getTitle())
 
-                // Entity မှာ instructor field မရှိတဲ့အတွက် null ထားထား
-
                 .thumbnail(meditation.getImageUrl())
 
                 .duration(meditation.getDuration())

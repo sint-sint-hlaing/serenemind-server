@@ -25,7 +25,7 @@ public class BreathingService {
                 .userId(userPrincipal.getId())
                 .exerciseType(request.getExerciseType())
                 .targetDurationMinutes(request.getDurationMinutes())
-                .completedRounds(0) // incremented via UI signals or computed at completion
+                .completedRounds(0)
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -35,7 +35,7 @@ public class BreathingService {
                 .sessionId(saved.getId())
                 .exerciseType(saved.getExerciseType())
                 .totalDurationSeconds(saved.getTargetDurationMinutes() * 60)
-                .estimatedRounds(saved.getTargetDurationMinutes() * 4) // Example logic for 4 rounds per minute
+                .estimatedRounds(saved.getTargetDurationMinutes() * 4)
                 .build();
     }
 
@@ -53,7 +53,6 @@ public class BreathingService {
                 .orElseThrow(() -> new RuntimeException("Session not found"));
 
         session.setCompletedAt(LocalDateTime.now());
-        // Hardcoded matching your UI screenshot illustration values for demo purposes
         session.setCompletedRounds(4);
         session.setCalculatedBreaths(12);
         breathingSessionRepository.save(session);

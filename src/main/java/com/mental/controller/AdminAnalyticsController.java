@@ -18,7 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin/analytics")
 @RequiredArgsConstructor
-@Transactional(readOnly = true) // Analytics တွေမို့ Read-Only သတ်မှတ်ထားသည်
+@Transactional(readOnly = true)
 public class AdminAnalyticsController {
 
     private final MoodTrackingService moodService;

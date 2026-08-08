@@ -22,10 +22,10 @@ public class Notification extends BaseEntity {
     private User user;
 
     @Column(nullable = false)
-    private String title; // e.g., "New like on your journal", "Reminder missed"
+    private String title;
 
     @Column(nullable = false, length = 500)
-    private String message; // e.g., "Aye Thinzar liked your journal..."
+    private String message;
 
     @Column(nullable = false)
     private String type; // LIKE, COMMENT, REMINDER, SYSTEM, GOAL, STREAK, INSPIRATION
@@ -34,7 +34,7 @@ public class Notification extends BaseEntity {
     private boolean isRead = false;
 
     @Column(name = "target_id")
-    private Long targetId; // Post ID သို့မဟုတ် Reminder ID သိမ်းရန်
+    private Long targetId;
 
     @Column(name = "target_type")
     private String targetType;

@@ -1,6 +1,6 @@
 package com.mental.service.impl;
 
-// ✅ DTO ကိုသာ import လုပ်ပါ
+
 import com.mental.dto.goal.UserGoal;  // DTO - Record
 
 // ✅ Entity ကို import မလုပ်ဘဲ Fully Qualified Name သုံးပါ
@@ -46,7 +46,7 @@ public class UserGoalServiceImpl implements UserGoalService {
         User user = getUserByEmail(email);
         LocalDate targetDate = LocalDate.now().plusDays(request.getTargetDays());
 
-        // ✅ Entity ကို Fully Qualified Name ဖြင့်သုံးပါ
+
         com.mental.model.entity.UserGoal entity = com.mental.model.entity.UserGoal.builder()
                 .user(user)
                 .title(request.getTitle().trim())
@@ -57,11 +57,11 @@ public class UserGoalServiceImpl implements UserGoalService {
                 .status(GoalStatus.ACTIVE)
                 .build();
 
-        // ✅ Repository က Entity ကိုသာ save လုပ်နိုင်သည်
+
         com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
         log.info("Goal created successfully with id: {}", saved.getId());
 
-        // ✅ Entity -> DTO သို့ပြောင်းပြီး return လုပ်ပါ
+
         return goalMapper.toDto(saved);
     }
 
@@ -69,7 +69,7 @@ public class UserGoalServiceImpl implements UserGoalService {
     public UserGoal updateProgress(Long id, String email) {
         log.info("Updating progress for goal: {} by user: {}", id, email);
 
-        // ✅ Entity ကို Fully Qualified Name ဖြင့်သုံးပါ
+
         com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
 
         validateGoalStatusForUpdate(entity);
@@ -100,10 +100,8 @@ public class UserGoalServiceImpl implements UserGoalService {
 
         User user = getUserByEmail(email);
 
-        // ✅ Repository က Entity list ကိုပြန်ပေးသည်
         List<com.mental.model.entity.UserGoal> entities = goalRepository.findByUser(user);
 
-        // ✅ Entity list ကို DTO list သို့ပြောင်းပါ
         return entities.stream()
                 .map(goalMapper::toDto)
                 .toList();
@@ -302,16 +300,13 @@ public class UserGoalServiceImpl implements UserGoalService {
                 .toList();
     }
 
-    // ============================================================
-    // PRIVATE HELPER METHODS
-    // ============================================================
+
 
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
 
-    // ✅ Entity ကို Fully Qualified Name ဖြင့်သုံးပါ
     private com.mental.model.entity.UserGoal getGoalAndValidateOwnership(Long goalId, String email) {
         com.mental.model.entity.UserGoal entity = goalRepository.findById(goalId)
                 .orElseThrow(() -> new ResourceNotFoundException("Goal not found with id: " + goalId));

@@ -312,7 +312,7 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
     public List<MoodEntry> findWeeklyByStatus(String email) {
         log.warn("findWeeklyByStatus is deprecated. Use getWeeklyMood instead.");
         try {
-            // ✅ Convert Instant to LocalDate
+
             LocalDate weekAgo = LocalDate.now().minusDays(7);
             return moodTrackingRepository.findWeeklyData(email, weekAgo);
         } catch (Exception e) {
@@ -326,7 +326,6 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
     public List<MoodEntry> findMonthlyStatus(String email) {
         log.warn("findMonthlyStatus is deprecated. Use getMonthlyMood instead.");
         try {
-            // ✅ Convert Instant to LocalDate
             LocalDate monthAgo = LocalDate.now().minusDays(30);
             return moodTrackingRepository.findMonthlyData(email, monthAgo);
         } catch (Exception e) {

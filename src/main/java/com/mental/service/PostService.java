@@ -44,7 +44,6 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
-    // UI - Post Detail (ပို့စ်တစ်ခုတည်းကို ID ဖြင့်ကြည့်ခြင်း)
     @Transactional(readOnly = true)
     public PostResponse getPostById(Long id, UserPrincipal userPrincipal) {
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
@@ -56,7 +55,6 @@ public class PostService {
         return convertToPostResponse(post, currentUser);
     }
 
-    // UI - Floating Action Button (+) ဖြင့် ပို့စ်အသစ်တင်ခြင်း (Cloudinary Image ပါဝင်သည်)
     @Transactional
     public PostResponse createPost(UserPrincipal userPrincipal, PostRequest request, MultipartFile imageFile) {
         User user = userRepository.findByEmail(userPrincipal.getEmail())
@@ -85,19 +83,17 @@ public class PostService {
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        // Check if the current user is the owner of the post
         if (!post.getUser().getId().equals(currentUser.getId())) {
             throw new AccessDeniedException("You do not have permission to delete this post");
         }
 
-        // Delete associated likes and saves first if cascading is not set at DB level
-        postLikeRepository.deleteByPostId(id); // Ensure this exists in PostLikeRepository if needed
-        postSaveRepository.deleteByPostId(id); // Ensure this exists in PostSaveRepository if needed
+        postLikeRepository.deleteByPostId(id);
+        postSaveRepository.deleteByPostId(id);
 
         postRepository.delete(post);
     }
 
-    // UI - Post တစ်ခုကို Like ပေးခြင်း / ပြန်ဖြုတ်ခြင်း (Toggle)
+
     @Transactional
     public void toggleLikePost(Long id, UserPrincipal userPrincipal) {
         Post post = postRepository.findById(id)
@@ -112,7 +108,6 @@ public class PostService {
                             postLikeRepository.delete(like);
                             post.setLikeCount(Math.max(0, post.getLikeCount() - 1));
 
-                            // 👈 Like ပြန်ဖြုတ်လိုက်လျှင် ဆောက်ခဲ့သော Noti ကို ပြန်ဖျက်ပေးသည့်အပိုင်း
                             if (!post.getUser().getId().equals(user.getId())) {
                                 String targetMessage = user.getUsername() + " liked your post: \"" + post.getContent() + "\"";
                                 notificationRepository.deleteByUserAndTitleAndMessage(post.getUser(), "New like on your post", targetMessage);
@@ -125,7 +120,6 @@ public class PostService {
                             postLikeRepository.save(newLike);
                             post.setLikeCount(post.getLikeCount() + 1);
 
-                            // 👈 Like ပေးလိုက်လျှင် ပို့စ်ပိုင်ရှင်ထံ Notification သွားသိမ်းပေးသည့်အပိုင်း
                             if (!post.getUser().getId().equals(user.getId())) {
                                 notificationService.createNotification(
                                         post.getUser(),
@@ -151,18 +145,17 @@ public class PostService {
 
         postSaveRepository.findByPostIdAndUserId(id, user.getId())
                 .ifPresentOrElse(
-                        postSaveRepository::delete, // Save ထားပြီးသားဖြစ်ပါက ပြန်ဖျက်မည်
+                        postSaveRepository::delete,
                         () -> {
                             PostSave newSave = PostSave.builder()
                                     .post(post)
                                     .user(user)
                                     .build();
-                            postSaveRepository.save(newSave); // Save မထားရသေးပါက သိမ်းမည်
+                            postSaveRepository.save(newSave);
                         }
                 );
     }
 
-    // UI - မိမိ Save လုပ်ထားသော Post များအားလုံးကို ပြန်ကြည့်ခြင်း
     @Transactional(readOnly = true)
     public List<PostResponse> getSavedPosts(UserPrincipal userPrincipal) {
         User user = userRepository.findByEmail(userPrincipal.getEmail())
@@ -175,7 +168,6 @@ public class PostService {
                 .collect(Collectors.toList());
     }
 
-    // convertToPostResponse Helper Method ထဲတွင် isSavedByMe ပါ ထည့်ပေးရန်
     private PostResponse convertToPostResponse(Post post, User currentUser) {
         boolean isLiked = postLikeRepository.existsByPostIdAndUserId(post.getId(), currentUser.getId());
         boolean isSaved = postSaveRepository.existsByPostIdAndUserId(post.getId(), currentUser.getId()); // 👈 စစ်ဆေးရန်
@@ -187,7 +179,7 @@ public class PostService {
         response.setLikeCount(post.getLikeCount());
         response.setCommentCount(post.getCommentCount());
         response.setLikedByMe(isLiked);
-        response.setSavedByMe(isSaved); // 👈 Set လုပ်ပေးရန်
+        response.setSavedByMe(isSaved);
         response.setCreatedAt(post.getCreatedAt());
         response.setAnonymous(post.isAnonymous());
 

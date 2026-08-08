@@ -47,24 +47,11 @@ public class JournalService {
     @Value("${groq.api.key:}")
     private String groqApiKey;
 
-    /** Allowed MIME types for photo uploads. */
     private static final Set<String> ALLOWED_MIME_TYPES =
             Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
-    /** Maximum allowed photo size: 5 MB. */
     private static final long MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024L;
 
-    // ─────────────────────────────────────────────
-    // CREATE
-    // ─────────────────────────────────────────────
-
-    /**
-     * POST /api/journals
-     * Create a new journal entry for the authenticated user (text only).
-     * To attach a photo, call POST /api/journals/{id}/photo after creation.
-     *
-     * Security review: Ownership from JWT ✅ | Content encrypted at rest ✅ | @Valid on request ✅
-     */
     @Transactional
     public JournalResponse createJournal(UserPrincipal userPrincipal, JournalRequest request) {
         User user = resolveUser(userPrincipal);
@@ -76,21 +63,13 @@ public class JournalService {
         journal.setEncryptedText(encryptedContent);
         journal.setUser(user);
         journal.setFavourite(request.isFavourite());
-        // photoUrl intentionally NOT set here — use POST /api/journals/{id}/photo
         journal.setTags(tagsToString(request.getTags()));
 
         Journal saved = journalRepository.save(journal);
         return convertToResponse(saved);
     }
 
-    // ─────────────────────────────────────────────
-    // READ – LIST
-    // ─────────────────────────────────────────────
 
-    /**
-     * GET /api/journals?filter=all|favorites|tagged
-     * Returns the user's journals filtered by tab selection.
-     */
     @Transactional(readOnly = true)
     public List<JournalResponse> getAllMyJournals(UserPrincipal userPrincipal, String filter) {
         User user = resolveUser(userPrincipal);
@@ -109,36 +88,19 @@ public class JournalService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * GET /api/journals  (backward-compat overload – no filter)
-     */
     @Transactional(readOnly = true)
     public List<JournalResponse> getAllMyJournals(UserPrincipal userPrincipal) {
         return getAllMyJournals(userPrincipal, "all");
     }
 
-    // ─────────────────────────────────────────────
-    // READ – SINGLE
-    // ─────────────────────────────────────────────
 
-    /**
-     * GET /api/journals/{id}
-     * Fetch a single journal entry by ID.
-     */
     @Transactional(readOnly = true)
     public JournalResponse getJournalById(Long id, UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(id, userPrincipal);
         return convertToResponse(journal);
     }
 
-    // ─────────────────────────────────────────────
-    // READ – SEARCH
-    // ─────────────────────────────────────────────
 
-    /**
-     * GET /api/journals/search?q=keyword
-     * Search journals by title for the authenticated user.
-     */
     @Transactional(readOnly = true)
     public List<JournalResponse> searchJournals(UserPrincipal userPrincipal, String query) {
         User user = resolveUser(userPrincipal);
@@ -146,11 +108,9 @@ public class JournalService {
 
         List<Journal> results;
         if (trimmedQuery.startsWith("#")) {
-            // Strip the leading '#' symbol and search only by tags
             String tagQuery = trimmedQuery.substring(1).trim();
             results = journalRepository.searchByUserAndTagOnly(user, tagQuery);
         } else {
-            // Search across both title and tags (case-insensitive)
             results = journalRepository.searchByUserAndTitleOrTag(user, trimmedQuery);
         }
 
@@ -159,17 +119,6 @@ public class JournalService {
                 .collect(Collectors.toList());
     }
 
-    // ─────────────────────────────────────────────
-    // UPDATE – FULL
-    // ─────────────────────────────────────────────
-
-    /**
-     * PUT /api/journals/{id}
-     * Fully update a journal entry (title, content, tags, privacy).
-     * Photo is managed separately via POST/DELETE /api/journals/{id}/photo.
-     *
-     * Security review: Ownership validated ✅ | Content re-encrypted ✅ | @Valid on request ✅
-     */
     @Transactional
     public JournalResponse updateJournal(Long id, JournalRequest request, UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(id, userPrincipal);
@@ -178,19 +127,11 @@ public class JournalService {
         journal.setEncryptedText(encryptionUtil.encrypt(request.getContent()));
         journal.setTags(tagsToString(request.getTags()));
         journal.setFavourite(request.isFavourite());
-        // photoUrl NOT updated here — managed exclusively via the photo endpoint
 
         return convertToResponse(journalRepository.save(journal));
     }
 
-    // ─────────────────────────────────────────────
-    // UPDATE – TOGGLE FAVOURITE
-    // ─────────────────────────────────────────────
 
-    /**
-     * PATCH /api/journals/{id}/favorite
-     * Toggle the favourite flag on a journal entry.
-     */
     @Transactional
     public JournalResponse toggleFavourite(Long id, UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(id, userPrincipal);
@@ -199,75 +140,46 @@ public class JournalService {
     }
 
 
-
-    // ─────────────────────────────────────────────
-    // DELETE
-    // ─────────────────────────────────────────────
-
-    /**
-     * DELETE /api/journals/{id}
-     * Permanently delete a journal entry.
-     */
     @Transactional
     public void deleteJournal(Long id, UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(id, userPrincipal);
         journalRepository.delete(journal);
     }
 
-    /**
-     * POST /api/journals/{id}/photo
-     * Upload or replace the photo attached to a journal entry via CloudinaryService.
-     *
-     * Flow:
-     *   1. Validate ownership, MIME type, and file size.
-     *   2. If an existing photo is stored, delete it on Cloudinary first.
-     *   3. Upload new image using CloudinaryService.
-     *   4. Persist the returned secure HTTPS URL on the journal record.
-     *
-     * Security review:
-     *   Ownership validated ✅ | MIME type whitelist (server-side) ✅
-     *   File size capped at 5 MB ✅ | Non-breaking integration with CloudinaryService ✅
-     *   ⚠️ SECURITY FLAG: Add rate limiting to this endpoint before production.
-     */
+
     @Transactional
     public JournalPhotoResponse uploadPhoto(Long journalId,
                                             MultipartFile file,
                                             UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(journalId, userPrincipal);
 
-        // ── 1. Validate file present
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Photo file must not be empty");
         }
 
-        // ── 2. Validate MIME type via server-side whitelist
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase())) {
             throw new IllegalArgumentException(
                     "Unsupported file type. Allowed: JPEG, PNG, WebP, GIF");
         }
 
-        // ── 3. Validate file size (max 5 MB)
+
         if (file.getSize() > MAX_PHOTO_SIZE_BYTES) {
             throw new IllegalArgumentException("Photo must not exceed 5 MB");
         }
 
-        // ── 4. Destroy old Cloudinary asset before replacing
         if (journal.getPhotoUrl() != null && !journal.getPhotoUrl().isBlank()) {
             try {
                 cloudinaryService.deleteImage(journal.getPhotoUrl());
             } catch (Exception e) {
-                // Non-blocking: proceed even if deletion fails (e.g. file already deleted from Cloudinary dashboard)
-            }
+           }
         }
 
-        // ── 5. Upload new image using CloudinaryService
-        String secureUrl = cloudinaryService.uploadImage(file);
+       String secureUrl = cloudinaryService.uploadImage(file);
         if (secureUrl == null) {
             throw new RuntimeException("Photo upload failed. Please try again.");
         }
 
-        // ── 6. Persist the Cloudinary secure URL
         journal.setPhotoUrl(secureUrl);
         journalRepository.save(journal);
 
@@ -278,18 +190,7 @@ public class JournalService {
         return response;
     }
 
-    // ─────────────────────────────────────────────
-    // PHOTO – DELETE (Cloudinary)
-    // ─────────────────────────────────────────────
 
-    /**
-     * DELETE /api/journals/{id}/photo
-     * Remove the photo from both Cloudinary and the journal record.
-     *
-     * Security review:
-     *   Ownership validated ✅ | Cloudinary asset destroyed by secure URL parsing ✅
-     *   Returns 404 if no photo exists ✅
-     */
     @Transactional
     public JournalPhotoResponse deletePhoto(Long journalId, UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(journalId, userPrincipal);
@@ -299,10 +200,8 @@ public class JournalService {
         }
 
         try {
-            // Destroy on Cloudinary using secure URL parsing
             cloudinaryService.deleteImage(journal.getPhotoUrl());
         } catch (Exception e) {
-            // Non-blocking: still clear database entry if Cloudinary deletion fails
         }
 
         journal.setPhotoUrl(null);
@@ -315,41 +214,25 @@ public class JournalService {
         return response;
     }
 
-    /**
-     * GET /api/journals/{id}/analysis
-     * Retrieve the AI analysis for a journal entry.
-     * Returns 404 if no analysis has been run yet.
-     */
+
     @Transactional(readOnly = true)
     public JournalAnalysisResponse getAnalysis(Long journalId, UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(journalId, userPrincipal);
 
         JournalAnalysis analysis = analysisRepository.findByJournal(journal)
                 .orElseThrow(() -> new ResourceNotFoundException(
-                        // Security: do NOT expose internal API paths or journal IDs in error messages
                         "Analysis not found. Trigger it first via the Analyse action."));
 
         return convertAnalysisToResponse(analysis);
     }
 
-    // ─────────────────────────────────────────────
-    // ANALYSIS – TRIGGER / UPSERT
-    // ─────────────────────────────────────────────
-
-    /**
-    /**
-     * POST /api/journals/{id}/analysis
-     * Trigger (or re-trigger) AI analysis for a journal entry.
-     * Connects to Google Gemini 1.5 Flash API with fallback to local mock logic on error.
-     */
     @Transactional
     public JournalAnalysisResponse triggerAnalysis(Long journalId, UserPrincipal userPrincipal) {
         Journal journal = findAndValidateOwnership(journalId, userPrincipal);
 
-        // Decrypt the journal content so we can analyse it
         String plainText = encryptionUtil.decrypt(journal.getEncryptedText());
 
-        // Fetch existing or create a new analysis record
+
         JournalAnalysis analysis = analysisRepository.findByJournal(journal)
                 .orElseGet(() -> {
                     JournalAnalysis a = new JournalAnalysis();
@@ -359,11 +242,7 @@ public class JournalService {
 
         boolean success = false;
 
-        // ⚠️ SECURITY FLAG: This endpoint has no rate limit.
-        //    Add @RateLimiter or a Bucket4j filter before production deployment.
-        //    Risk: Medium — a malicious user could spam AI analysis calls.
 
-        // Try calling the Groq API for live analysis
         if (groqApiKey != null && !groqApiKey.isBlank()) {
             try {
                 String url = "https://api.groq.com/openai/v1/chat/completions";
@@ -399,7 +278,6 @@ public class JournalService {
 
                 if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                     JsonNode root = objectMapper.readTree(response.getBody());
-                    // Groq returns: choices[0].message.content (plain JSON string)
                     String jsonText = root.path("choices").get(0).path("message").path("content").asText();
 
                     JsonNode resultNode = objectMapper.readTree(jsonText);
@@ -419,12 +297,10 @@ public class JournalService {
                     success = true;
                 }
             } catch (Exception e) {
-                // Non-blocking error logging — fallback to mock analysis below
                 System.err.println("Error calling Groq API: " + e.getMessage());
             }
         }
 
-        // ── Fallback to Mock AI analysis logic if API call failed ─────────────────
         if (!success) {
             analysis.setEmotion(mockDetectEmotion(plainText));
             analysis.setSentiment(mockDetectSentiment(plainText));
@@ -434,36 +310,21 @@ public class JournalService {
             analysis.setAiResponse(mockAiResponse(plainText));
             analysis.setAiSuggestion(mockAiSuggestion(analysis.getEmotion()));
         }
-        // ─────────────────────────────────────────────────────────────────
 
         JournalAnalysis saved = analysisRepository.save(analysis);
         return convertAnalysisToResponse(saved);
     }
 
-    // ─────────────────────────────────────────────
-    // PRIVATE HELPERS
-    // ─────────────────────────────────────────────
 
     private User resolveUser(UserPrincipal principal) {
         return userRepository.findByEmail(principal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
-    /**
-     * Finds a journal by ID and validates that the authenticated user is the owner.
-     *
-     * Security contract:
-     *   - Returns 404 if the journal does not exist (correct: do not confirm existence to non-owners).
-     *   - Returns 403 Forbidden (via AccessDeniedException → Spring Security → 403 mapping)
-     *     if the journal exists but belongs to a different user.
-     *   - Never returns the resource to a non-owner.
-     */
     private Journal findAndValidateOwnership(Long id, UserPrincipal principal) {
         Journal journal = journalRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Journal not found"));
-        // Use email comparison — ID comparison alone could be spoofed via token manipulation
         if (!journal.getUser().getEmail().equals(principal.getEmail())) {
-            // AccessDeniedException is handled by Spring Security's AccessDeniedHandler → 403
             throw new AccessDeniedException("Access denied");
         }
         return journal;
@@ -474,11 +335,9 @@ public class JournalService {
         response.setId(journal.getId());
         response.setTitle(journal.getTitle());
 
-        // Null-guard: encryptedText could be null for legacy / partially-migrated records
         if (journal.getEncryptedText() != null && !journal.getEncryptedText().isBlank()) {
             String decrypted = encryptionUtil.decrypt(journal.getEncryptedText());
             response.setContent(decrypted);
-            // Construct plain text preview directly
             String plain = decrypted.trim();
             response.setPreview(plain.length() > 120 ? plain.substring(0, 120) + "…" : plain);
         }
@@ -486,10 +345,6 @@ public class JournalService {
         response.setTags(stringToTags(journal.getTags()));
         response.setFavourite(journal.isFavourite());
         response.setPhotoUrl(journal.getPhotoUrl());
-        //response.setCreatedAt(journal.getCreatedAt());
-       // response.setUpdatedAt(journal.getUpdatedAt());
-
-        // Attach inline analysis only if it already exists (no eager AI calls)
         if (journal.getAnalysis() != null) {
             response.setAnalysis(convertAnalysisToResponse(journal.getAnalysis()));
         }
@@ -507,11 +362,10 @@ public class JournalService {
         r.setKeyThemes(stringToTags(analysis.getKeyThemes()));
         r.setAiResponse(analysis.getAiResponse());
         r.setAiSuggestion(analysis.getAiSuggestion());
-       // r.setAnalysedAt(analysis.getUpdatedAt());
         return r;
     }
 
-    // Tag helpers
+
     private String tagsToString(List<String> tags) {
         if (tags == null || tags.isEmpty()) return null;
         return tags.stream()
@@ -532,7 +386,6 @@ public class JournalService {
         return "High";
     }
 
-    // ── Mock AI helpers (replace with real AI integration) ────────────────
 
     private String mockDetectEmotion(String text) {
         String lower = text.toLowerCase();

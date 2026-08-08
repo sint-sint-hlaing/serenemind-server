@@ -4,7 +4,6 @@ import com.mental.dto.UserDto;
 
 import java.util.List;
 public interface AdminUserService {
-    // User Management
 
     List<UserDto> getUsers();
 

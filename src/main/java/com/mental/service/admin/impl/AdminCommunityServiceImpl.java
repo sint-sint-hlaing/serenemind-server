@@ -57,7 +57,7 @@ public class AdminCommunityServiceImpl implements AdminCommunityService {
                 .generatedAt(LocalDateTime.now())
                 .build();
 
-        // 👈 List တစ်ခုအဖြစ် ထည့်သွင်း၍ ပြန်ပေးခြင်း
+
         return List.of(summaryDto);
     }
 

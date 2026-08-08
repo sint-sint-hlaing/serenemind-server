@@ -26,7 +26,6 @@ public class MoodMapper {
                 .note(request.note())
                 .date(LocalDate.now())
                 .build();
-        // createdAt နှင့် updatedAt ကို BaseEntity က @CreationTimestamp နှင့် @UpdateTimestamp ဖြင့် auto handle လုပ်ပေးမည်
     }
 
     public DailyMoodResponse toDailyResponse(MoodEntry entry) {

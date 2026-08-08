@@ -6,7 +6,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class UserGoalMapper {
 
-    // Return type ကို package အပြည့်အစုံဖြင့် ရေးပါ
     public com.mental.dto.goal.UserGoal toDto(UserGoal entity) {
         if(entity == null) {
             return null;

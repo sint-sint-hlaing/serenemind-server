@@ -8,5 +8,5 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AuditLogRepository extends JpaRepository <AuditLog, Long> {
-    Page<AuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable); // အသစ်ဆုံး Log များကို အရင်ပြသည်
+    Page<AuditLog> findAllByOrderByCreatedAtDesc(Pageable pageable);
 }

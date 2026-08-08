@@ -10,26 +10,7 @@ import org.springframework.web.client.RestTemplate;
 @RequiredArgsConstructor
 public class EmotionService {
 
-
-
     private final RestTemplate restTemplate;
-
-    /*
-    public EmotionResponse analyze(String text){
-
-        EmotionRequest request =
-                new EmotionRequest(text);
-
-        return restTemplate.postForObject(
-
-                "http://localhost:8000/analyze",
-
-                request,
-
-                EmotionResponse.class
-
-        );**/
-
 
 
 }

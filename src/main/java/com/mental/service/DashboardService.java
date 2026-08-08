@@ -8,6 +8,7 @@ import com.mental.model.entity.MoodEntry;
 import com.mental.model.entity.User;
 import com.mental.model.entity.enums.MoodType;
 import com.mental.repository.MoodTrackingRepository;
+import com.mental.repository.NotificationRepository;
 import com.mental.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,12 +26,15 @@ public class DashboardService {
     private final UserRepository userRepository;
     private final MoodTrackingRepository moodRepository;
     private final DashboardMapper dashboardMapper;
+    private final NotificationRepository notificationRepository;
 
     public DashboardResponse getDashboardData(String email) {
         log.debug("Fetching dashboard data for user: {}", email);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        long unreadCount = notificationRepository.countByUserIdAndIsReadFalse(user.getId());
 
         return DashboardResponse.builder()
                 .username(user.getUsername())
@@ -41,6 +45,7 @@ public class DashboardService {
                 .quickActions(getQuickActions())
                 .currentStreak(user.getCurrentStreak())
                 .isNewBest(user.getCurrentStreak() >= user.getLongestStreak())
+                .unreadNotificationCount(unreadCount)
                 .build();
     }
 
@@ -71,7 +76,6 @@ public class DashboardService {
         for (DayOfWeek day : DayOfWeek.values()) {
             LocalDate date = today.with(day);
 
-            // If the date is in the future, skip or set to 0
             if (date.isAfter(today)) {
                 continue;
             }
@@ -100,10 +104,11 @@ public class DashboardService {
 
     private List<QuickActionResponse> getQuickActions() {
         return List.of(
-                new QuickActionResponse("Journal", "📓", "journal"),
+                new QuickActionResponse("Journal", "📒", "journal"),
                 new QuickActionResponse("Meditation", "🧘", "meditation"),
                 new QuickActionResponse("Goals", "🎯", "goal"),
-                new QuickActionResponse("Breathing", "🌬️", "breathing")
+                new QuickActionResponse("Breathing", "🌬️", "sereneAI")
         );
     }
 }
+

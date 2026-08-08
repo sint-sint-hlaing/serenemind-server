@@ -6,9 +6,9 @@ import java.time.LocalDateTime;
 @Builder
 public record ReportSummaryDto(
         Long id,
-        String reportType,      // 👈 ဘယ် Report အမျိုးအစားလဲ (ဥပမာ: MOOD_REPORT)
+        String reportType,
         long total,
         long todayCount,
         double growthPercentage,
-        LocalDateTime generatedAt // 👈 Report ထုတ်ပေးသည့်အချိန်
+        LocalDateTime generatedAt
 ) { }

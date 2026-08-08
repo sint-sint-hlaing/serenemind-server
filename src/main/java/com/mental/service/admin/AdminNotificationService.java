@@ -5,7 +5,5 @@ import com.mental.dto.admin.NotificationDto;
 
 public interface AdminNotificationService {
     NotificationDto createNotification(NotificationRequest request);
-    // Notification Management
-    
 
 }

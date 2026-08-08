@@ -38,7 +38,7 @@ public class AdminReportServiceImpl implements AdminReportService {
 
 
         return ReportSummaryDto.builder()
-                .id(1L) // လိုအပ်သော ID (သို့မဟုတ် Database မှ ရလာသော ID)
+                .id(1L)
                 .reportType("USER_REPORT")
                 .total(totalUsers)
                 .todayCount(todayUsers)
@@ -59,7 +59,7 @@ public class AdminReportServiceImpl implements AdminReportService {
         long todayMood =
                 moodRepository.countToday();
         return ReportSummaryDto.builder()
-                .id(1L) // လိုအပ်သော ID (သို့မဟုတ် Database မှ ရလာသော ID)
+                .id(1L)
                 .reportType("MOOD_REPORT")
                 .total(totalMood)
                 .todayCount(todayMood)
@@ -85,7 +85,7 @@ public class AdminReportServiceImpl implements AdminReportService {
 
 
         return ReportSummaryDto.builder()
-                .id(1L) // လိုအပ်သော ID (သို့မဟုတ် Database မှ ရလာသော ID)
+                .id(1L)
                 .reportType("MEDITATION_REPORT")
                 .total(todaySession)
                 .todayCount(totalSession)

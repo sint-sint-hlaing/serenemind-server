@@ -20,7 +20,7 @@ public class ReminderController {
 
     private final ReminderService reminderService;
 
-    // UI - Reminders List Screen (အသုံးပြုသူ၏ Reminders အားလုံးကို ပြရန်)
+
     @GetMapping
     public ResponseEntity<List<ReminderResponse>> getUserReminders(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -29,7 +29,7 @@ public class ReminderController {
         return ResponseEntity.ok(reminders);
     }
 
-    // UI - New Reminder Screen -> Save (နှိပ်ပြီး Reminder အသစ် သိမ်းဆည်းရန်)
+
     @PostMapping
     public ResponseEntity<ReminderResponse> createReminder(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -39,7 +39,7 @@ public class ReminderController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    // UI - Reminders Screen Toggle (Reminder တစ်ခုချင်းစီကို ဖွင့်/ပိတ် Toggle လုပ်ရန်)
+
     @PatchMapping("/{id}/toggle")
     public ResponseEntity<ReminderResponse> toggleReminderStatus(
             @PathVariable Long id,
@@ -49,7 +49,7 @@ public class ReminderController {
         return ResponseEntity.ok(response);
     }
 
-    // Optional: UI - Reminder တစ်ခုကို ဖျက်ချင်လျှင် သို့မဟုတ် ပြန်ပြင်ချင်လျှင် သုံးနိုင်ရန်
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteReminder(
             @PathVariable Long id,

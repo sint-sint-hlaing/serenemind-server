@@ -11,7 +11,7 @@ public class FcmService {
 
     public void sendPushNotification(String token, String title, String body) throws FirebaseMessagingException {
         Message message = Message.builder()
-                .setToken(token) // User ၏ Device Token
+                .setToken(token)
                 .setNotification(Notification.builder()
                         .setTitle(title)
                         .setBody(body)

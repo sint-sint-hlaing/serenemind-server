@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @Builder
-@NoArgsConstructor       // Default Constructor အတွက်
+@NoArgsConstructor
 @AllArgsConstructor
 public class PostResponse {
     private Long id;

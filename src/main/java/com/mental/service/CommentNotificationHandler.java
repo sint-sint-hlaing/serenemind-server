@@ -15,7 +15,7 @@ public class CommentNotificationHandler {
     private final NotificationService notificationService;
 
     public void notifyPostOwner(Post post, Comment comment, User commenter) {
-        // Don't notify if commenter is the post owner
+
         if (post.getUser().getId().equals(commenter.getId())) {
             return;
         }

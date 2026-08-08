@@ -24,7 +24,7 @@ public class ReminderRequest {
 
     private String reminderTone; // e.g., "Gentle Bell"
 
-    private String note; // Optional additional details
+    private String note;
 
     private boolean enabled = true; // For the toggle switch
 }

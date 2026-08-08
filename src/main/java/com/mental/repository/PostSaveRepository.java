@@ -12,5 +12,5 @@ public interface PostSaveRepository extends JpaRepository<PostSave, Long> {
     void deleteByPostId(Long postId);
     Optional<PostSave> findByPostIdAndUserId(Long postId, Long userId);
     boolean existsByPostIdAndUserId(Long postId, Long userId);
-    List<PostSave> findAllByUserIdOrderByPostCreatedAtDesc(Long userId); // User သိမ်းထားသော ပို့စ်များ ဆွဲထုတ်ရန်
+    List<PostSave> findAllByUserIdOrderByPostCreatedAtDesc(Long userId);
 }

@@ -24,8 +24,7 @@ public class CloudinaryService {
 
     private Cloudinary cloudinary;
 
-    // application.properties ထဲက keys တွေကို ဖတ်ပြီးတာနဲ့ Cloudinary Object ကို အလိုအလျောက် တည်ဆောက်ပေးခြင်း
-    @PostConstruct
+   @PostConstruct
     public void init() {
         this.cloudinary = new Cloudinary(ObjectUtils.asMap(
                 "cloud_name", cloudName,
@@ -35,12 +34,10 @@ public class CloudinaryService {
         ));
     }
 
-    /**
-     * Frontend မှ ပေးပို့လိုက်သော ပုံကို Cloudinary သို့ တင်ပေးပြီး Secure URL (https://...) ပြန်ပေးမည့် Method
-     */
+
     public String uploadImage(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            return null; // ပုံမပါလာပါက null သာ ပြန်မည်
+            return null;
         }
         try {
             Map<?, ?> uploadResult = cloudinary.uploader().upload(
@@ -48,7 +45,6 @@ public class CloudinaryService {
                     ObjectUtils.emptyMap()
             );
 
-            // Cloudinary မှ ပေးသော secure_url ကို ဆွဲထုတ်ပြီး String အနေဖြင့် ပြန်ပေးခြင်း
             return uploadResult.get("secure_url").toString();
         } catch (IOException e) {
             throw new RuntimeException("Cloudinary သို့ ပုံတင်ခြင်း မအောင်မြင်ပါ- ", e);
@@ -56,9 +52,7 @@ public class CloudinaryService {
     }
 
 
-    /**
-     * Delete an image from Cloudinary using its secure URL.
-     */
+
     public void deleteImage(String imageUrl) {
         if (imageUrl == null || imageUrl.isBlank()) {
             return;
@@ -78,14 +72,14 @@ public class CloudinaryService {
             int uploadIndex = url.indexOf("/upload/");
             if (uploadIndex == -1) return null;
 
-            String sub = url.substring(uploadIndex + 8); // strip up to "/upload/"
+            String sub = url.substring(uploadIndex + 8);
 
-            // If it starts with a version path (e.g. v1571218039/), skip it
+
             if (sub.startsWith("v") && sub.indexOf('/') != -1 && sub.substring(1, sub.indexOf('/')).matches("\\d+")) {
                 sub = sub.substring(sub.indexOf('/') + 1);
             }
 
-            // Strip file extension
+
             int dotIndex = sub.lastIndexOf('.');
             if (dotIndex != -1) {
                 sub = sub.substring(0, dotIndex);
@@ -111,7 +105,7 @@ public class CloudinaryService {
             return uploadRequest.get("secure_url").toString();
 
         } catch (Exception e) {
-            // RuntimeException မှာ message နဲ့ cause (e) ကိုသာ ထည့်ပေးရပါမယ်
+
             throw new RuntimeException("Cloudinary သို့ ဖိုင်တင်ခြင်း မအောင်မြင်ပါ: " + e.getMessage(), e);
         }
     }

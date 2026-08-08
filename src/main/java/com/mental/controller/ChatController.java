@@ -19,7 +19,7 @@ public class ChatController {
 
     private final ChatService chatService;
 
-    // UI - မက်ဆေ့ချ်ပို့ပြီး Groq AI ဆီက တုံ့ပြန်ချက်ရယူရန်
+
     @PostMapping("/send")
     public ResponseEntity<ConversationResponse> sendMessage(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -28,7 +28,7 @@ public class ChatController {
         return ResponseEntity.ok(response);
     }
 
-    // UI - Home screen ပေါ်ရှိ Previous conversations များကို ပြန်ပြရန်
+
     @GetMapping("/conversations")
     public ResponseEntity<List<ConversationResponse>> getUserConversations(
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
@@ -42,5 +42,15 @@ public class ChatController {
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
         List<MessageResponse> messages = chatService.getMessagesByConversationId(id, userPrincipal);
         return ResponseEntity.ok(messages);
+    }
+
+
+    @DeleteMapping("/conversations/{id}")
+    public ResponseEntity<Void> deleteConversation(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal userPrincipal) {
+
+        chatService.deleteConversation(id, userPrincipal);
+        return ResponseEntity.noContent().build();
     }
 }

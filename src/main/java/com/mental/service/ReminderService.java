@@ -45,14 +45,13 @@ public class ReminderService {
         LocalTime nowTime = LocalTime.now();
         LocalDate today = LocalDate.now();
 
-        // 💡 အကယ်၍ သတ်မှတ်ထားသောရက်က ဒီနေ့ဖြစ်ပြီး၊ အချိန်က လက်ရှိအချိန်ထက် ကျော်လွန်နေခဲ့လျှင်
         if (finalStartDate.equals(today) && request.getReminderTime().isBefore(nowTime)) {
             String repeatType = request.getRepeatType() != null ? request.getRepeatType().toUpperCase() : "ONCE";
 
             switch (repeatType) {
                 case "ONCE":
                 case "DAILY":
-                    // ONCE ကော DAILY ကော အချိန်ကျော်လျှင် မနက်ဖြန် (Tomorrow) သို့ ရွှေ့မည်
+
                     finalStartDate = today.plusDays(1);
                     break;
 
@@ -95,7 +94,7 @@ public class ReminderService {
                 .repeatType(request.getRepeatType())
                 .repeatDays(request.getRepeatDays())
                 .reminderTime(request.getReminderTime())
-                .startDate(finalStartDate) // 👈 တွက်ချက်ပြီးသား ရက်စွဲအသစ်ကို ထည့်သွင်းမည်
+                .startDate(finalStartDate)
                 .reminderTone(request.getReminderTone())
                 .note(request.getNote())
                 .enabled(request.isEnabled())
@@ -122,8 +121,7 @@ public class ReminderService {
         reminderRepository.delete(reminder);
     }
 
-//    @Async
-// @Async <-- ❌ Noti ၂ စောင်ပွားခြင်းမှ ကာကွယ်ရန် ဤလိုင်းကို လုံးဝ ဖြတ်ပစ်ပါ
+
 @Transactional
 public void triggerReminderAlert(Long reminderId) {
     Reminder reminder = reminderRepository.findById(reminderId)
@@ -135,20 +133,16 @@ public void triggerReminderAlert(Long reminderId) {
     String title = "Reminder Alert";
     String message = "It's time for your reminder: \"" + reminder.getTitle() + "\"";
 
-    // DB ထဲ Notification Record ထည့်ခြင်း
     notificationService.createNotification(user, title, message, "REMINDER", reminder.getId(), "REMINDER");
 
-    // FCM Push Notification ပါ တစ်ပါတည်း တိုက်ရိုက်ပို့ခြင်း (အပေါ်က @Async ဖြုတ်ထား၍ ဤနေရာတွင် စိတ်ချလက်ချ ခေါ်နိုင်ပါပြီ)
-//    fcmPushService.sendPushNotificationToUser(user, title, message, reminder.getId(), "REMINDER");
 }
 
-    // Helper method to convert Entity to Response DTO
     private ReminderResponse convertToResponse(Reminder reminder) {
         ReminderResponse response = new ReminderResponse();
         response.setId(reminder.getId());
         response.setTitle(reminder.getTitle());
         response.setRepeatType(reminder.getRepeatType());
-        response.setRepeatDays(reminder.getRepeatDays()); // 👈 ၂။ App ဘက်ကို Response ပြန်ပေးနိုင်ရန် ထည့်ပါ
+        response.setRepeatDays(reminder.getRepeatDays());
         response.setReminderTime(reminder.getReminderTime());
         response.setStartDate(reminder.getStartDate());
         response.setReminderTone(reminder.getReminderTone());

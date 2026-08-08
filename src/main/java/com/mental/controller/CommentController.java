@@ -20,7 +20,6 @@ public class CommentController {
 
     private final CommentService commentService;
 
-    // UI - ပို့စ်တစ်ခုချင်းစီအောက်က ကွန်မန့်များအားလုံးကို ဆွဲထုတ်ခြင်း
     @GetMapping
     public ResponseEntity<List<CommentResponse>> getCommentsByPost(
             @PathVariable Long postId,
@@ -30,7 +29,6 @@ public class CommentController {
         return ResponseEntity.ok(comments);
     }
 
-    // UI - "Add a comment..." နေရာတွင် ကွန်မန့်အသစ် ရိုက်ထည့်ခြင်း
     @PostMapping
     public ResponseEntity<CommentResponse> createComment(
             @PathVariable Long postId,

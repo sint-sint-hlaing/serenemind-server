@@ -13,7 +13,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true) // Read-only transactions for better performance
+@Transactional(readOnly = true)
 public class AvatarService {
 
     private final AvatarRepository avatarRepository;
@@ -26,9 +26,6 @@ public class AvatarService {
                 .toList();
     }
 
-    /**
-     * Active ဖြစ်နေသော Avatar များသာ ယူရန် (Refactored from AdminAvatarService)
-     */
     public List<AvatarResponse> getActiveAvatars() {
         return avatarRepository.findByIsActiveTrue()
                 .stream()

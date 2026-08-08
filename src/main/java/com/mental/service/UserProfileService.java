@@ -66,7 +66,7 @@ public class UserProfileService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
 
-        // 1. Update Username if provided and changed
+
         if (request.getUsername() != null && !request.getUsername().isBlank()) {
             user.setUsername(request.getUsername());
             userRepository.save(user);
@@ -97,15 +97,12 @@ public class UserProfileService {
         profile.setBirthday(request.getBirthday());
         profile.setBio(request.getBio());
 
-
-        // 2. Handle Cloudinary Image Upload
         if (request.getAvatar() != null && !request.getAvatar().isEmpty()) {
-            // Delete old avatar if present
+
             if (profile.getAvatar() != null && !profile.getAvatar().isBlank()) {
                 cloudinaryService.deleteImage(profile.getAvatar());
             }
 
-            // Upload new image
             String newImageUrl = cloudinaryService.uploadImage(request.getAvatar());
             profile.setAvatar(newImageUrl);
         }
@@ -160,7 +157,7 @@ public PersonalInformationResponse getPersonalInformation(String email) {
             .email(user.getEmail())
             .username(user.getUsername())
             .birthday(profile != null ? profile.getBirthday() : null)
-            .accountStatus("Active") // Or pull dynamically from user entity if available: user.getStatus().name()
+            .accountStatus("Active")
             .role(user.getRole() != null ? user.getRole().name() : "User")
             .memberSince(user.getCreatedAt())
             .build();
@@ -171,9 +168,8 @@ public PersonalInformationResponse getPersonalInformation(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
-        // သင့် database ဆက်စပ်ပုံအပေါ်မူတည်ပြီး profile ကို ဆွဲထုတ်ပါ
         UserProfile profile = userProfileRepository.findByUser(user)
-                .orElse(new UserProfile()); // မရှိသေးလျှင် အလွတ် object တစ်ခုပေးရန်
+                .orElse(new UserProfile());
 
         return ProfileResponse.builder()
                 .fullname(profile.getFullname())

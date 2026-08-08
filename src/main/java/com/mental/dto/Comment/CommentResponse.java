@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 
 
 @Getter @Setter @Builder
-@NoArgsConstructor       // Default Constructor အတွက်
+@NoArgsConstructor
 @AllArgsConstructor
 public class CommentResponse {
     private Long id;

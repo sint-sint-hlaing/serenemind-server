@@ -9,8 +9,6 @@ import java.util.Base64;
 @Component
 public class EncryptionUtil {
 
-    // Testing အတွက် 16-byte key တစ်ခုကို Hardcode ပြထားခြင်းဖြစ်ပါသည်
-    // Production တွင် env variable သို့မဟုတ် application.properties မှ ယူရပါမည်
     private static final String SECRET_KEY = "SereneMindSecret";
     private static final String ALGORITHM = "AES";
 

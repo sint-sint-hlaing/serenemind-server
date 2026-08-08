@@ -55,9 +55,7 @@ public class AdminNotificationServiceImpl
         );
 
 
-        /*
-          If notification is for specific user
-        */
+
         if(request.getUserId() != null){
 
             User user = userRepository.findById(

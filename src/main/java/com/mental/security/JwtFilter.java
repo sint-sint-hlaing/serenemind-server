@@ -55,11 +55,10 @@ public class JwtFilter extends OncePerRequestFilter {
                     }
                 }
             } catch (JwtException e) {
-                // Token သက်တမ်းကုန်ခြင်း၊ ပုံစံမှားခြင်း သို့မဟုတ် လက်မှတ်မမှန်ခြင်းအားလုံးကို ဤနေရာတွင် ဖမ်းမည်
                 res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 res.setContentType("application/json");
                 res.getWriter().write("{\"error\": \"Unauthorized\", \"message\": \"" + e.getMessage() + "\"}");
-                return; // Chain ဆက်မသွားစေရန် ရပ်တန့်သည်
+                return;
             } catch (Exception e) {
                 res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 res.setContentType("application/json");

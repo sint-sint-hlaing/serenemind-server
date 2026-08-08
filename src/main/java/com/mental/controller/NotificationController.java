@@ -19,7 +19,7 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    // UI - Notifications Screen (All, Unread, Mentions, System filter များအတွက်)
+
     @GetMapping
     public ResponseEntity<List<NotificationResponse>> getNotifications(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -29,7 +29,6 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
-    // UI - Notification တစ်ခုချင်းစီကို ဖတ်ပြီးကြောင်း Mark လုပ်ရန် (အစက်အပြာလေး ပျောက်သွားစေရန်)
     @PatchMapping("/{id}/read")
     public ResponseEntity<Void> markAsRead(
             @PathVariable Long id,
@@ -39,7 +38,7 @@ public class NotificationController {
         return ResponseEntity.ok().build();
     }
 
-    // UI - Notification အားလုံးကို တစ်ခါတည်း အဖတ်မှတ်ရန် (Clear or Mark All as Read)
+
     @PostMapping("/read-all")
     public ResponseEntity<Void> markAllAsRead(@AuthenticationPrincipal UserPrincipal userPrincipal) {
         notificationService.markAllAsRead(userPrincipal);
@@ -63,16 +62,6 @@ public class NotificationController {
         return ResponseEntity.ok(notifications);
     }
 
-
-//    // UI/Testing - Notification အသစ် ဆောက်ရန် (Create Notification)
-//    @PostMapping
-//    public ResponseEntity<NotificationResponse> createNotification(
-//            @AuthenticationPrincipal UserPrincipal userPrincipal,
-//            @jakarta.validation.Valid @RequestBody com.mental.dto.Notification.NotificationRequest request) {
-//
-//        NotificationResponse response = notificationService.createNotification(userPrincipal, request);
-//        return  ResponseEntity.ok(response);
-//    }
 
     @GetMapping("/{id}/click")
     public ResponseEntity<NotificationResponse> clickNotification(

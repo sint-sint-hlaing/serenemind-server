@@ -47,10 +47,10 @@ public class User extends BaseEntity {
     
     private boolean isActive;
 
-    // 👈 Streak ဆိုင်ရာ Field များ
+
     private int currentStreak = 0;
     private int longestStreak = 0;
-    private int streakFreezeCount = 1; // စဖွင့်ချင်း Free Item တစ်ခုပေးထားမည်
+    private int streakFreezeCount = 1;
     private LocalDate lastActiveDate;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)

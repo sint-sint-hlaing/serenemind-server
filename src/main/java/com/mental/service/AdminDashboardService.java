@@ -13,25 +13,25 @@ import org.springframework.data.domain.Pageable;
 import java.util.List;
 
 public interface AdminDashboardService {
-   // DashboardStatsDto getDashboardOverview();
+
     Page<UserDto> getAllUsers(Pageable pageable);
 
 
- Page<UserDto> getActiveUsers(Pageable pageable);
+    Page<UserDto> getActiveUsers(Pageable pageable);
 
- List<MoodDistributionDto> getMoodDistributionData();
+    List<MoodDistributionDto> getMoodDistributionData();
 
- MoodStatsResponse getMoodsCount();
+    MoodStatsResponse getMoodsCount();
 
- JournalStatsResponse getJournalsCount();
+    JournalStatsResponse getJournalsCount();
 
- MeditationStatsResponse getMeditationsCount();
+    MeditationStatsResponse getMeditationsCount();
 
- GrowthRateResponse getMonthlyRate();
+    GrowthRateResponse getMonthlyRate();
 
- Page<AuditLogResponse> getAuditLogs(Pageable pageable);
+    Page<AuditLogResponse> getAuditLogs(Pageable pageable);
 
- Page<FlaggedJournalResponse> getFlaggedJournals(Pageable pageable);
+    Page<FlaggedJournalResponse> getFlaggedJournals(Pageable pageable);
 
- void resolveFlaggedJournal(@Min(1) Long id);
+    void resolveFlaggedJournal(@Min(1) Long id);
 }

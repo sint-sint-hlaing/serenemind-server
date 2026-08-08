@@ -18,9 +18,9 @@ public record MeditationRequest(
         String category,
         @Min(value = 1, message = "Duration must be at least 1 minute")
         String duration,
-        @NotNull(message = "Difficulty is required") // 👈 ၁။ ဒီလိုင်း အသစ်ထည့်ပါ
+        @NotNull(message = "Difficulty is required")
         Integer difficulty,
-        MultipartFile audioFile, // Audio File လက်ခံရန်
+        MultipartFile audioFile,
         MultipartFile imageFile
 ) {
 }

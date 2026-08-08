@@ -20,7 +20,7 @@ public class BreathingController {
 
     private final BreathingService breathingService;
 
-    // UI - "Start Breathing" button click on Configuration Screen
+
     @PostMapping("/session/start")
     public ResponseEntity<BreathingSessionResponse> startSession(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -30,7 +30,7 @@ public class BreathingController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    // UI - Event tracking for completed timers/rounds if tracked real-time on server
+
     @PostMapping("/session/{sessionId}/round-complete")
     public ResponseEntity<Void> trackRoundCompletion(
             @PathVariable String sessionId,
@@ -40,7 +40,7 @@ public class BreathingController {
         return ResponseEntity.ok().build();
     }
 
-    // UI - "Done" button or completion transition to show the Summary screen
+
     @PostMapping("/session/{sessionId}/complete")
     public ResponseEntity<BreathingSummaryResponse> completeSession(
             @PathVariable String sessionId,

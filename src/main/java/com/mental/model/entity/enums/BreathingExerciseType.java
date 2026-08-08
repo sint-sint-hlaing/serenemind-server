@@ -14,5 +14,4 @@ public enum BreathingExerciseType {
         this.description = description;
     }
 
-    // Getters
 }

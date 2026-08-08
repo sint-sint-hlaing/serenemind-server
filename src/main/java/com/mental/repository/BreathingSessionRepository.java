@@ -9,6 +9,5 @@ import java.util.List;
 @Repository
 public interface BreathingSessionRepository extends JpaRepository<BreathingSession, String> {
 
-    // Fetch exercise history for a specific user ordered by latest session
     List<BreathingSession> findByUserIdOrderByCreatedAtDesc(Long userId);
 }

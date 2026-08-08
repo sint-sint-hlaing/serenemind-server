@@ -26,7 +26,7 @@ public abstract class BaseEntity {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    // ===== Convenience Methods =====
+
 
     public Instant getCreatedAtAsInstant() {
         return createdAt != null ? createdAt.toInstant(java.time.ZoneOffset.UTC) : null;

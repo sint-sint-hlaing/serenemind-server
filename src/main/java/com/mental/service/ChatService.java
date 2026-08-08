@@ -41,7 +41,6 @@ public class ChatService {
         Long userId = userPrincipal.getId();
         Conversation conversation;
 
-        // ၁။ Conversation ရှိမရှိ စစ်ဆေးခြင်း သို့မဟုတ် အသစ်ဖန်တီးခြင်း
         if (request.getConversationId() == null) {
             String initialTitle = request.getMessage().length() > 30
                     ? request.getMessage().substring(0, 25) + "..."
@@ -58,7 +57,7 @@ public class ChatService {
                     .orElseThrow(() -> new RuntimeException("Conversation not found"));
         }
 
-        // ၂။ ယခင် Chat History များကို database မှ ဆွဲထုတ်ခြင်း (Context သိစေရန်)
+
         List<Message> previousMessages = messageRepository.findByConversationIdOrderByTimestampAsc(conversation.getId());
 
         StringBuilder historyBuilder = new StringBuilder();
@@ -66,7 +65,6 @@ public class ChatService {
             historyBuilder.append(m.getSender()).append(": ").append(m.getContent()).append("\n");
         }
 
-        // ၃။ User Message အသစ်ကို Database ထဲ သိမ်းဆည်းခြင်း
         Message userMessage = messageRepository.save(
                 Message.builder()
                         .conversation(conversation)
@@ -75,11 +73,11 @@ public class ChatService {
                         .build()
         );
 
-        // ၄။ ယခင် History အပါအဝင် လက်ရှိမက်ဆေ့ချ်ကို AI ထံ ပို့ရန် Prompt တည်ဆောက်ခြင်း
+
         String fullPrompt = "Conversation History:\n" + historyBuilder.toString() +
                 "user: " + request.getMessage() + "\nassistant:";
 
-        // ၅။ Groq AI (Llama 3) ထံမှ အဖြေတောင်းခံခြင်း
+
         ChatClient chatClient = chatClientBuilder.build();
         String aiResponseText = chatClient.prompt()
                 .system(SYSTEM_PROMPT)
@@ -87,7 +85,6 @@ public class ChatService {
                 .call()
                 .content();
 
-        // ၆။ AI Response ကို Database ထဲ သိမ်းဆည်းခြင်း
         Message aiMessage = messageRepository.save(
                 Message.builder()
                         .conversation(conversation)
@@ -96,7 +93,7 @@ public class ChatService {
                         .build()
         );
 
-        // ၇. Response ပြန်ထုတ်ရန် map လုပ်ခြင်း
+
         List<MessageResponse> messageResponses = List.of(userMessage, aiMessage).stream()
                 .map(m -> MessageResponse.builder()
                         .id(m.getId())
@@ -121,8 +118,7 @@ public class ChatService {
                 .map(conv -> {
                     List<Message> messages = messageRepository.findByConversationIdOrderByTimestampAsc(conv.getId());
 
-                    // Message ၏ timestamp ကို မသုံးဘဲ Conversation ၏ createdAt (သို့မဟုတ် မက်ဆေ့ချ်များထဲမှ အသစ်ဆုံး createdAt) ကို ယူခြင်း
-                    Instant lastActivityTime = messages.stream()
+                   Instant lastActivityTime = messages.stream()
                             .map(BaseEntity::getCreatedAt)
                             .filter(java.util.Objects::nonNull)
                             .map(dateTime -> dateTime.atZone(java.time.ZoneId.systemDefault()).toInstant()) // LocalDateTime ကို Instant သို့ ပြောင်းခြင်း
@@ -148,8 +144,7 @@ public class ChatService {
                                     .build()
                     };
                 })
-                // Instant (createdAt) အလိုက် အသစ်ဆုံးကို အပေါ်ဆုံးတင်ရန် Descending စီခြင်း
-                .sorted((a, b) -> ((Instant) b[0]).compareTo((Instant) a[0]))
+              .sorted((a, b) -> ((Instant) b[0]).compareTo((Instant) a[0]))
                 .map(obj -> (ConversationResponse) obj[1])
                 .toList();
     }
@@ -158,8 +153,7 @@ public class ChatService {
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new RuntimeException("Conversation not found"));
 
-        // အသုံးပြုသူသည် ၎င်းတို့၏ conversation ကိုသာ ကြည့်ခွင့်ရှိကြောင်း လုံခြုံရေးစစ်ဆေးခြင်း
-        if (!conversation.getUserId().equals(userPrincipal.getId())) {
+      if (!conversation.getUserId().equals(userPrincipal.getId())) {
             throw new RuntimeException("Unauthorized access to conversation");
         }
 
@@ -172,5 +166,19 @@ public class ChatService {
                         .timestamp(m.getTimestamp())
                         .build())
                 .toList();
+    }
+
+    @Transactional
+    public void deleteConversation(Long conversationId, UserPrincipal userPrincipal) {
+        Conversation conversation = conversationRepository.findById(conversationId)
+                .orElseThrow(() -> new RuntimeException("Conversation not found"));
+
+       if (!conversation.getUserId().equals(userPrincipal.getId())) {
+            throw new RuntimeException("Unauthorized access to delete this conversation");
+        }
+
+       messageRepository.deleteAllByConversationId(conversationId);
+
+        conversationRepository.delete(conversation);
     }
 }

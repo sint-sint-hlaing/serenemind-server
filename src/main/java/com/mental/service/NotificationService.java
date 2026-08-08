@@ -29,7 +29,7 @@ public class NotificationService {
     private final UserRepository userRepository;
     private final FcmPushService fcmPushService;
 
-    // UI - Filter အလိုက် Notification List ဆွဲထုတ်ခြင်း
+
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(UserPrincipal userPrincipal, String filter) {
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
@@ -37,7 +37,7 @@ public class NotificationService {
 
         List<Notification> notifications;
 
-        // UI က Tab filter (All, Unread, Mentions, System) အပေါ်မူတည်ပြီး Query ခွဲထုတ်ခြင်း
+
         switch (filter.toLowerCase()) {
             case "unread":
                 notifications = notificationRepository.findByUserAndIsReadFalseOrderByCreatedAtDesc(currentUser);
@@ -59,7 +59,6 @@ public class NotificationService {
                 .collect(Collectors.toList());
     }
 
-    // UI - Notification တစ်ခုကို Read ဖြစ်အောင် ပြောင်းလဲခြင်း
     @Transactional
     public void markAsRead(Long id, UserPrincipal userPrincipal) {
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
@@ -72,7 +71,7 @@ public class NotificationService {
         notificationRepository.save(notification);
     }
 
-    // UI - Notification အားလုံးကို တစ်ခါတည်း Read ဖြစ်အောင် ပြောင်းလဲခြင်း
+
     @Transactional
     public void markAllAsRead(UserPrincipal userPrincipal) {
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
@@ -85,7 +84,6 @@ public class NotificationService {
         notificationRepository.saveAll(unreadNotifications);
     }
 
-    // Notification အသစ် ဆောက်ပေးမည့် Method
     @Transactional
     public void createNotification(User recipient, String title, String message, String type, Long targetId, String targetType) {
         Notification noti = new Notification();
@@ -102,7 +100,6 @@ public class NotificationService {
         fcmPushService.sendPushNotificationToUser(recipient, title, message, targetId, targetType);
     }
 
-    // Noti ကို နှိပ်လိုက်လျှင် Read true လုပ်ပြီး Target အချက်အလက် ပြန်ပေးမည်
     @Transactional
     public NotificationResponse clickAndGetNotification(Long id, UserPrincipal userPrincipal) {
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
@@ -111,7 +108,7 @@ public class NotificationService {
         Notification notification = notificationRepository.findByIdAndUser(id, currentUser)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
 
-        // 👈 မဖတ်ရသေးရင် Read True ပြောင်းပေးရန်
+
         if (!notification.isRead()) {
             notification.setRead(true);
             notificationRepository.save(notification);
@@ -131,7 +128,6 @@ public class NotificationService {
             response.setCreatedAt(notification.getCreatedAt());
         }
 
-        // 👈 Target Data များ ထည့်ပေးရန်
         response.setTargetId(notification.getTargetId());
         response.setTargetType(notification.getTargetType());
 

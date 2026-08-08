@@ -18,13 +18,10 @@ public class AuditLog {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // User (Admin ID)
     private String username;
 
-    // (ဥပမာ: "DELETE_USER", "FLAG_JOURNAL", "UPDATE_ROLE")
     private String action;
 
-    // (ဥပမာ - Journal ID သို့မဟုတ် User ID)
     private Long targetId;
 
     @Column(columnDefinition = "TEXT")

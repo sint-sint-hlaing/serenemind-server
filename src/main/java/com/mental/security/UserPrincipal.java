@@ -18,18 +18,15 @@ public class UserPrincipal
         this.user=user;
     }
 
-    // UserPrincipal.java ထဲတွင် ဤအတိုင်း အစားထိုးပြင်ဆင်ပါ
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // 1. Enum ဖြစ်စေ၊ String ဖြစ်စေ .name() သို့မဟုတ် .toString() သို့ သေချာပြောင်းလဲခြင်း
         String roleName = user.getRole().toString().trim();
 
-        // 2. တကယ်လို့ database ထဲက role မှာ ROLE_ ဆိုတာ ကြိုမပါခဲ့ရင် အရှေ့ကနေ ပေါင်းပေးခြင်း
         if (!roleName.startsWith("ROLE_")) {
             roleName = "ROLE_" + roleName;
         }
 
-        // 3. စာလုံးအကြီး/အသေး ပြဿနာမရှိစေရန် ToUpperCase ပြုလုပ်ခြင်း
         return List.of(new SimpleGrantedAuthority(roleName.toUpperCase()));
     }
 

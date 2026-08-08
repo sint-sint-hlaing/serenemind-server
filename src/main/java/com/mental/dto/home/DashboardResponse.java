@@ -23,7 +23,9 @@ public record DashboardResponse(
 
         Integer currentStreak,
 
-        Boolean isNewBest
+        Boolean isNewBest,
+
+        long unreadNotificationCount
 
 ) {
 

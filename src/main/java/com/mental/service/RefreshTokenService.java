@@ -16,12 +16,9 @@ import java.util.Base64;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
-
     private final RefreshTokenRepository repository;
 
-
     private final SecureRandom random = new SecureRandom();
-
 
     private final long refreshExpire =
             30L * 24 * 60 * 60;

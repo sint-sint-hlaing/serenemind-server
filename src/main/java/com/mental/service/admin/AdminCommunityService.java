@@ -7,9 +7,6 @@ import com.mental.dto.report.ReportSummaryDto;
 import java.util.List;
 
 public interface AdminCommunityService {
-    // Community Management
-
-
 
     void deleteCommunityPost(Long id);
 

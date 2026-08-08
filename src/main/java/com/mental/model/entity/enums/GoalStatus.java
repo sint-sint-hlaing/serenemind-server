@@ -2,9 +2,6 @@ package com.mental.model.entity.enums;
 
 import lombok.Getter;
 
-/**
- * Goal Status Enum
- */
 @Getter
 public enum GoalStatus {
     ACTIVE("Active", "Goal is in progress"),
@@ -22,16 +19,11 @@ public enum GoalStatus {
         this.description = description;
     }
 
-    /**
-     * Check if goal is still active (not completed or cancelled)
-     */
+
     public boolean isActive() {
         return this == ACTIVE || this == PAUSED;
     }
 
-    /**
-     * Check if goal is finished (completed, cancelled, or expired)
-     */
     public boolean isFinished() {
         return this == COMPLETED || this == CANCELLED || this == EXPIRED;
     }

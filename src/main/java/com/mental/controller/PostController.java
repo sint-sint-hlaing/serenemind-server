@@ -21,18 +21,18 @@ public class PostController {
 
     private final PostService postService;
 
-    // UI - Community Screen (Popular, Recent feed များအတွက်)
+
     @GetMapping
     public ResponseEntity<List<PostResponse>> getAllPosts(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
             @RequestParam(defaultValue = "recent") String filter) {
 
-        // filter parameter မူတည်ပြီး Popular သို့မဟုတ် Recent ခွဲထုတ်နိုင်ပါတယ်
+
         List<PostResponse> posts = postService.getAllPosts(userPrincipal, filter);
         return ResponseEntity.ok(posts);
     }
 
-    // UI - Post Detail Screen (ပို့စ်တစ်ခုတည်းကို ID ဖြင့်ကြည့်ခြင်း)
+
     @GetMapping("/{id}")
     public ResponseEntity<PostResponse> getPostById(
             @PathVariable Long id,
@@ -42,7 +42,7 @@ public class PostController {
         return ResponseEntity.ok(post);
     }
 
-    // UI - Floating Action Button (+) နှိပ်ပြီး ပို့စ်အသစ်တင်ခြင်း
+
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<PostResponse> createPost(
             @AuthenticationPrincipal UserPrincipal userPrincipal,
@@ -53,14 +53,14 @@ public class PostController {
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
-    // UI - Post တစ်ခုကို ဖျက်ခြင်း (Delete Post)
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deletePost(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal userPrincipal) {
 
         postService.deletePost(id, userPrincipal);
-        return ResponseEntity.noContent().build(); // 204 No Content
+        return ResponseEntity.noContent().build();
     }
 
     // UI - Post တစ်ခုကို Like ပေးခြင်း သို့မဟုတ် Like ပြန်ဖြုတ်ခြင်း (Toggle)
