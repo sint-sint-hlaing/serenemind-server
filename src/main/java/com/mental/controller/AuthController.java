@@ -54,7 +54,6 @@ public class AuthController {
             @RequestBody RefreshRequest request
     ) {
 
-
         return authService.refresh(request);
 
     }
@@ -64,11 +63,6 @@ public class AuthController {
     public ResponseEntity<Void> logout(@Valid @RequestBody LogoutRequest request) {
         authService.logout(request);
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/welcome")
-    public String greeting() {
-        return "Hello World";
     }
 
 }
