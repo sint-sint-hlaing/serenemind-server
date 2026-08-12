@@ -29,4 +29,6 @@ public interface UserRepository
     long countByCreatedAtBetween(LocalDateTime localDateTime, LocalDateTime now);
 
     long countByIsActiveTrue();
+
+    Optional<User> findByResetPasswordToken(String token);
 }

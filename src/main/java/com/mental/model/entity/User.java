@@ -62,6 +62,9 @@ public class User extends BaseEntity {
     private LocalDateTime lastLogin;
     private LocalDateTime loginTime;
 
+    private String resetPasswordToken;
+    private LocalDateTime resetPasswordTokenExpiry;
+
     public UserProfile getUserProfile() {
         return profile;
     }
