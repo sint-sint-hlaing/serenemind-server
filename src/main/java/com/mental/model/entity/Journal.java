@@ -31,6 +31,9 @@ public class Journal extends BaseEntity {
     @Column(length = 1024)
     private String photoUrl;
 
+    @Column(name = "is_private", nullable = false)
+    private boolean isPrivate = false;
+
     @Lob
     private String encryptedText;
 
