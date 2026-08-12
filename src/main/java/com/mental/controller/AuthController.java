@@ -66,5 +66,9 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/welcome")
+    public String greeting() {
+        return "Hello World";
+    }
 
 }
