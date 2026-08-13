@@ -1,5 +1,7 @@
 package com.mental.config;
 
+import com.mental.exception.CustomAccessDeniedHandler;
+import com.mental.security.CustomAuthenticationEntryPoint;
 import com.mental.security.JwtFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -18,6 +20,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
+    private final CustomAuthenticationEntryPoint authEntryPoint;
+    private final CustomAccessDeniedHandler accessDeniedHandler;
 
     @Bean
     SecurityFilterChain filter(
@@ -44,11 +48,14 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated()
                 )
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(authEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
                 .addFilterBefore(
                         jwtFilter,
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
-
     }
 
 
