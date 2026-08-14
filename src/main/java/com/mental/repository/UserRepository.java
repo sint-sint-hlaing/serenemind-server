@@ -30,5 +30,7 @@ public interface UserRepository
 
     long countByIsActiveTrue();
 
+    boolean existsByEmail(String username);
+
     Optional<User> findByResetPasswordToken(String token);
 }

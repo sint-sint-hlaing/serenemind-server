@@ -16,6 +16,20 @@ import java.util.Optional;
 @Repository
 public interface MoodTrackingRepository extends JpaRepository<MoodEntry, Long> {
 
+
+    @Query("SELECT m FROM MoodEntry m WHERE m.user.email = :email AND m.date = :date ORDER BY m.createdAt DESC")
+    Optional<MoodEntry> findTopByUserEmailAndDateOrderByCreatedAtDesc(
+            @Param("email") String email,
+            @Param("date") LocalDate date
+    );
+    List<MoodEntry> findByUserEmailAndDateBetweenOrderByDateDesc(
+            String email,
+            LocalDate startDate,
+            LocalDate endDate
+    );
+
+    List<MoodEntry> findByUserEmail(String email);
+    List<MoodEntry> findByUserIdAndDateBetweenOrderByDateAsc(Long userId, LocalDate startDate, LocalDate endDate);
     // ============================================================
     // USER BASED QUERIES - Using @Query
     // ============================================================
@@ -37,12 +51,9 @@ public interface MoodTrackingRepository extends JpaRepository<MoodEntry, Long> {
 
     Optional<MoodEntry> findTopByUserOrderByCreatedAtDesc(User user);
 
-    @Query("SELECT m FROM MoodEntry m WHERE m.user.email = :email AND m.date = :date ORDER BY m.createdAt DESC")
-    Optional<MoodEntry> findTopByUserEmailAndDateOrderByCreatedAtDesc(
-            @Param("email") String email,
-            @Param("date") LocalDate date
-    );
+    Optional<MoodEntry> findFirstByUserEmailAndDateOrderByCreatedAtDesc(String email, LocalDate date);
 
+    List<MoodEntry> findAllByUserEmailAndDateOrderByCreatedAtDesc(String email, LocalDate date);
     Optional<MoodEntry> findByUserAndDate(User user, LocalDate date);
 
     @Query("SELECT m FROM MoodEntry m WHERE m.user.email = :email AND m.date = :date")
@@ -161,4 +172,6 @@ public interface MoodTrackingRepository extends JpaRepository<MoodEntry, Long> {
             @Param("email") String email,
             @Param("mood") MoodType mood
     );
+
+    boolean existsByUserIdAndDate(Long id, LocalDate today);
 }

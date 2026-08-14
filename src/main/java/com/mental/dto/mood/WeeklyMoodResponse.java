@@ -1,5 +1,6 @@
 package com.mental.dto.mood;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.mental.model.entity.enums.MoodType;
 import lombok.Builder;
 
@@ -7,108 +8,109 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 
 @Builder
+@JsonInclude(JsonInclude.Include.NON_NULL)
+
 public record WeeklyMoodResponse(
+        // ===== Daily Entry Fields =====
         DayOfWeek day,
         MoodType mood,
         Integer percentage,
         Integer intensity,
         String note,
+
+        // ===== Summary Fields =====
         Integer totalEntries,
         LocalDate startDate,
-        LocalDate endDate
+        LocalDate endDate,
+
+        // ===== Computed Fields =====
+        boolean dailyEntry,
+        String dayName,
+        String moodEmoji,
+        String moodMessage,
+        boolean summary
 ) {
-    // ===== Validation =====
-    public WeeklyMoodResponse {
-        if (percentage != null && (percentage < 0 || percentage > 100)) {
-            throw new IllegalArgumentException("Percentage must be between 0 and 100");
-        }
-        if (intensity != null && (intensity < 0 || intensity > 10)) {
-            throw new IllegalArgumentException("Intensity must be between 0 and 10");
-        }
-        if (totalEntries != null && totalEntries < 0) {
-            throw new IllegalArgumentException("Total entries cannot be negative");
-        }
-        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
-            throw new IllegalArgumentException("Start date must be before or equal to end date");
-        }
-    }
+    // ===== Factory Methods =====
 
-    // ===== Static Factory Methods =====
-
-    public static WeeklyMoodResponse of(DayOfWeek day, MoodType mood, Integer percentage) {
+    /**
+     * Daily Entry အတွက် Factory Method
+     */
+    public static WeeklyMoodResponse createDailyEntry(DayOfWeek day, MoodType mood,
+                                                      Integer percentage, Integer intensity,
+                                                      String note) {
         return WeeklyMoodResponse.builder()
                 .day(day)
-                .mood(mood)
-                .percentage(percentage)
-                .build();
-    }
-
-    public static WeeklyMoodResponse of(DayOfWeek day, MoodType mood, Integer percentage, Integer intensity) {
-        return WeeklyMoodResponse.builder()
-                .day(day)
-                .mood(mood)
-                .percentage(percentage)
-                .intensity(intensity)
-                .build();
-    }
-
-    public static WeeklyMoodResponse of(DayOfWeek day, MoodType mood, Integer percentage, Integer intensity, String note) {
-        return WeeklyMoodResponse.builder()
-                .day(day)
-                .mood(mood)
-                .percentage(percentage)
-                .intensity(intensity)
+                .mood(mood != null ? mood : MoodType.NEUTRAL)
+                .percentage(percentage != null ? percentage : 0)
+                .intensity(intensity != null ? intensity : 0)
                 .note(note)
+                .totalEntries(null)
+                .startDate(null)
+                .endDate(null)
+                .dailyEntry(true)
+                .dayName(day != null ? day.name() : null)
+                .moodEmoji(mood != null ? mood.getEmoji() : "😐")
+                .moodMessage(mood != null ? mood.getMessage() : "No mood recorded")
+                .summary(false)
                 .build();
     }
 
-    public static WeeklyMoodResponse summary(MoodType dominantMood, Integer intensity,
-                                             Integer totalEntries, LocalDate startDate, LocalDate endDate) {
+    /**
+     * Empty Daily Entry အတွက် Factory Method
+     */
+    public static WeeklyMoodResponse createEmptyDailyEntry(DayOfWeek day) {
         return WeeklyMoodResponse.builder()
-                .mood(dominantMood)
-                .intensity(intensity)
-                .totalEntries(totalEntries)
+                .day(day)
+                .mood(MoodType.NEUTRAL)
+                .percentage(0)
+                .intensity(0)
+                .note(null)
+                .totalEntries(null)
+                .startDate(null)
+                .endDate(null)
+                .dailyEntry(true)
+                .dayName(day != null ? day.name() : null)
+                .moodEmoji("🌱")
+                .moodMessage("Today is a fresh start")
+                .summary(false)
+                .build();
+    }
+
+    /**
+     * ✅ Weekly Summary အတွက် Factory Method (ပြင်ဆင်ထားသည်)
+     */
+    public static WeeklyMoodResponse createSummary(MoodType dominantMood,
+                                                   Integer intensity,
+                                                   Integer totalEntries,
+                                                   LocalDate startDate,
+                                                   LocalDate endDate) {
+        // ✅ dateRange ကို သေချာပြင်ဆင်ခြင်း
+        String dateRange = null;
+        if (startDate != null && endDate != null) {
+            dateRange = startDate + " ~ " + endDate;
+        } else if (startDate != null) {
+            dateRange = startDate + " ~ present";
+        } else if (endDate != null) {
+            dateRange = "past ~ " + endDate;
+        }
+
+        // ✅ dominantMood မရှိပါက NEUTRAL ထားရန်
+        MoodType finalMood = dominantMood != null ? dominantMood : MoodType.NEUTRAL;
+
+        return WeeklyMoodResponse.builder()
+                .day(null)
+                .mood(finalMood)
+                .percentage(null)
+                .intensity(intensity != null ? intensity : 0)
+                .note(null)
+                .totalEntries(totalEntries != null ? totalEntries : 0)
                 .startDate(startDate)
                 .endDate(endDate)
+                .dailyEntry(false)
+                .dayName(null)
+                .moodEmoji(finalMood.getEmoji())  // ✅ Emoji ထည့်ပေးခြင်း
+                .moodMessage(finalMood.getMessage())  // ✅ Message ထည့်ပေးခြင်း
+                .summary(true)  // ✅ summary ကို true ထားရန်
                 .build();
-    }
-
-    public static WeeklyMoodResponse emptySummary() {
-        return WeeklyMoodResponse.builder()
-                .mood(MoodType.NEUTRAL)
-                .intensity(0)
-                .totalEntries(0)
-                .startDate(LocalDate.now().minusDays(7))
-                .endDate(LocalDate.now())
-                .build();
-    }
-
-    // ===== Helper Methods =====
-
-    public boolean isDailyEntry() {
-        return day != null;
-    }
-
-    public boolean isSummary() {
-        return startDate != null && endDate != null;
-    }
-
-    public String getDateRange() {
-        if (startDate != null && endDate != null) {
-            return startDate + " ~ " + endDate;
-        }
-        return null;
-    }
-
-    public String getDayName() {
-        return day != null ? day.name() : null;
-    }
-
-    public String getMoodEmoji() {
-        return mood != null ? mood.getEmoji() : "😐";
-    }
-
-    public String getMoodMessage() {
-        return mood != null ? mood.getMessage() : "No mood recorded";
     }
 }

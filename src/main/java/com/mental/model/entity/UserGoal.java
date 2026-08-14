@@ -1,5 +1,7 @@
 package com.mental.model.entity;
 
+import com.mental.dto.goal.GoalNoteDTO;
+import com.mental.model.entity.enums.Frequency;
 import com.mental.model.entity.enums.GoalStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -8,6 +10,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter @Setter
 @Builder
@@ -31,14 +35,36 @@ public class UserGoal {
     @Column(length = 1000)
     private String description;
 
+    @Enumerated(EnumType.STRING)
+    private Frequency frequency;
+
     @Column(name = "target_days", nullable = false)
     private int targetDays;
+
+    @Column(nullable = false)
+    private int progress = 0;
+
+    @Column(name = "unit")
+    private String unit;
+
+    @Column(name = "icon")
+    private String icon = "📚";
+
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "silent_mode")
+    private Boolean silentMode = false;
+
+    @Column(name = "streak")
+    private int streak = 0;
+
 
     @Column(name = "target_date")
     private LocalDate targetDate;
 
-    @Column(nullable = false)
-    private int progress = 0;
+
+
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -54,4 +80,11 @@ public class UserGoal {
 
     @Column(name = "completed_at")
     private LocalDate completedAt;
+
+    @OneToMany(mappedBy = "goal", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<GoalProgress> progressHistory = new ArrayList<>();
+
+    @OneToMany(mappedBy = "goal", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private List<GoalNote> notes = new ArrayList<>();
+
 }

@@ -1,6 +1,6 @@
 package com.mental.controller;
 
-import com.mental.dto.Streak.StreakResponse;
+import com.mental.dto.Steak.StreakResponse;
 import com.mental.security.UserPrincipal;
 import com.mental.service.StreakService;
 import lombok.RequiredArgsConstructor;

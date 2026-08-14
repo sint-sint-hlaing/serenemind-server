@@ -1,4 +1,4 @@
-package com.mental.dto.Streak;
+package com.mental.dto.Steak;
 
 import lombok.*;
 import java.util.List;

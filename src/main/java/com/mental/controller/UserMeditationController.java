@@ -35,14 +35,6 @@ public class UserMeditationController {
     }
 
 
-    @GetMapping("/search")
-    public List<MeditationResponse> search(
-            @RequestParam String keyword
-    ){
-
-        return meditationService.search(keyword);
-
-    }
 
     @PostMapping("/favorites")
     public ResponseEntity<?> addFavorite(

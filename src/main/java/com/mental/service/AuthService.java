@@ -148,7 +148,6 @@ public AuthResponse register(RegisterRequest req) {
 
         UserProfile profile = new UserProfile();
         profile.setUser(user);
-
         user.setProfile(profile);
 
         users.save(user);

@@ -46,10 +46,49 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
         log.info("Saving mood for user: {}", email);
 
         User user = findUserByEmail(email);
+        LocalDate today = LocalDate.now();
+
+        // Check if mood already saved for today
+       /** boolean alreadySaved = moodTrackingRepository.existsByUserIdAndDate(
+                user.getId(),
+                today
+        );
+
+        if (alreadySaved) {
+            throw new IllegalStateException("You have already saved a mood for today.");
+        }*/
+
+        // Calculate score based on mood percentage and intensity
+        int score = calculateMoodScore(request.mood(), request.intensity());
+
+        // Create entity with calculated score
         MoodEntry entry = moodMapper.toEntity(request, user);
+        entry.setDate(today);
+        entry.setScore(score); // Set calculated score
+
         moodTrackingRepository.save(entry);
 
-        log.info("Mood saved successfully for user: {}", email);
+        log.info("Mood saved successfully for user: {} with score: {}", email, score);
+    }
+
+
+    private int calculateMoodScore(MoodType mood, int intensity) {
+        // Validate intensity
+        if (intensity < 1 || intensity > 100) {
+            log.warn("Invalid intensity: {}, defaulting to 5", intensity);
+            intensity = Math.min(10, Math.max(1, intensity)); // Clamp to valid range
+        }
+        // Get base percentage from enum
+        int baseScore = mood.getPercentage();
+
+        // Intensity adjustment: -20% to +20%
+        // Intensity 1 = -20%, 5 = 0%, 10 = +20%
+        double intensityAdjustment = (intensity - 5) * 4.0; // Range: -20 to +20
+
+        double finalScore = baseScore + intensityAdjustment;
+
+        // Clamp between 0 and 100
+        return (int) Math.max(0, Math.min(100, Math.round(finalScore)));
     }
 
     // ==================== SUMMARY ====================
@@ -93,8 +132,9 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
     public DailyMoodResponse getMoodByDate(String email, LocalDate date) {
         log.debug("Fetching mood for user: {} on date: {}", email, date);
 
+        // ✅ Method 1: Use findFirst (JPA Method)
         MoodEntry mood = moodTrackingRepository
-                .findTopByUserEmailAndDateOrderByCreatedAtDesc(email, date)
+                .findFirstByUserEmailAndDateOrderByCreatedAtDesc(email, date)
                 .orElseThrow(() -> new ResourceNotFoundException("Mood not found for date: " + date));
 
         return moodMapper.toDailyResponse(mood);
@@ -116,39 +156,40 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
             return createEmptyWeeklyMood(weekAgo, today);
         }
 
-        // Group by day of week and get the latest entry for each day
-        Map<DayOfWeek, MoodEntry> latestByDay = entries.stream()
-                .collect(Collectors.toMap(
-                        entry -> entry.getDate().getDayOfWeek(),
-                        entry -> entry,
-                        (existing, newEntry) -> existing.getDate().isAfter(newEntry.getDate()) ? existing : newEntry
+        List<WeeklyMoodResponse> responses = new ArrayList<>();
+
+        for (DayOfWeek day : DayOfWeek.values()) {
+            // ထိုနေ့အတွက် မှတ်တမ်းရှိမရှိ စစ်ဆေးခြင်း
+            Optional<MoodEntry> entryForDay = entries.stream()
+                    .filter(entry -> entry.getDate().getDayOfWeek() == day)
+                    .reduce((first, second) -> {
+                        // တစ်နေ့တည်းတွင် မှတ်တမ်းများစွာရှိပါက နောက်ဆုံးတစ်ခုကို ယူပါ
+                        return first.getCreatedAt().isAfter(second.getCreatedAt()) ? first : second;
+                    });
+
+            if (entryForDay.isPresent()) {
+                // ✅ မှတ်တမ်းရှိသောနေ့
+                MoodEntry entry = entryForDay.get();
+                responses.add(WeeklyMoodResponse.createDailyEntry(
+                        day,
+                        entry.getMood(),
+                        entry.getScore(),        // ✅ သိမ်းဆည်းထားသော Score ကို သုံးပါ
+                        entry.getIntensity(),
+                        entry.getNote()
                 ));
 
-        // Create response for each day of the week
-        List<WeeklyMoodResponse> responses = new ArrayList<>();
-        for (DayOfWeek day : DayOfWeek.values()) {
-            MoodEntry entry = latestByDay.get(day);
-
-            if (entry != null) {
-                responses.add(WeeklyMoodResponse.builder()
-                        .day(day)
-                        .mood(entry.getMood())
-                        .percentage(getMoodPercentage(entry.getMood()))
-                        .intensity(entry.getIntensity())
-                        .note(entry.getNote())
-                        .build());
+                log.debug("Day: {}, Mood: {}, Score: {}, Intensity: {}",
+                        day, entry.getMood(), entry.getScore(), entry.getIntensity());
             } else {
-                responses.add(WeeklyMoodResponse.builder()
-                        .day(day)
-                        .mood(MoodType.NEUTRAL)
-                        .percentage(0)
-                        .intensity(0)
-                        .build());
+                // ✅ မှတ်တမ်းမရှိသောနေ့
+                responses.add(WeeklyMoodResponse.createEmptyDailyEntry(day));
+                log.debug("Day: {}, No entry found", day);
             }
         }
 
         return responses;
     }
+
 
     // ==================== MONTHLY ====================
 
@@ -174,28 +215,30 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
 
         List<WeeklyMoodResponse> weeklyMoods = getWeeklyMood(email);
 
+        // ✅ Filter out days with no entries
         List<WeeklyMoodResponse> validMoods = weeklyMoods.stream()
                 .filter(m -> m.percentage() != null && m.percentage() > 0)
                 .collect(Collectors.toList());
 
         if (validMoods.isEmpty()) {
             log.debug("No weekly mood data found for user: {}", email);
-            return WeeklyMoodResponse.builder()
-                    .mood(MoodType.NEUTRAL)
-                    .intensity(0)
-                    .totalEntries(0)
-                    .startDate(LocalDate.now().minusDays(7))
-                    .endDate(LocalDate.now())
-                    .build();
+            // ✅ Empty summary ကို ပြန်ပေးခြင်း
+            return WeeklyMoodResponse.createSummary(
+                    MoodType.NEUTRAL,
+                    0,
+                    0,
+                    LocalDate.now().minusDays(7),
+                    LocalDate.now()
+            );
         }
 
-        // Calculate average intensity
+        // ✅ Calculate average intensity
         double avgIntensity = validMoods.stream()
                 .mapToInt(m -> m.intensity() != null ? m.intensity() : 0)
                 .average()
                 .orElse(0.0);
 
-        // Find most common mood
+        // ✅ Find most common mood
         Map<MoodType, Long> moodCounts = validMoods.stream()
                 .map(WeeklyMoodResponse::mood)
                 .collect(Collectors.groupingBy(m -> m, Collectors.counting()));
@@ -205,15 +248,15 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
                 .map(Map.Entry::getKey)
                 .orElse(MoodType.NEUTRAL);
 
-        return WeeklyMoodResponse.builder()
-                .mood(dominantMood)
-                .intensity((int) Math.round(avgIntensity))
-                .totalEntries(validMoods.size())
-                .startDate(LocalDate.now().minusDays(7))
-                .endDate(LocalDate.now())
-                .build();
+        // ✅ Create summary with all fields populated
+        return WeeklyMoodResponse.createSummary(
+                dominantMood,
+                (int) Math.round(avgIntensity),
+                validMoods.size(),
+                LocalDate.now().minusDays(7),
+                LocalDate.now()
+        );
     }
-
     // ==================== DELETE ====================
 
     @Override
@@ -307,7 +350,7 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
 
     // ==================== DEPRECATED METHODS ====================
 
-    @Deprecated
+
     @Override
     public List<MoodEntry> findWeeklyByStatus(String email) {
         log.warn("findWeeklyByStatus is deprecated. Use getWeeklyMood instead.");
@@ -321,7 +364,6 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
         }
     }
 
-    @Deprecated
     @Override
     public List<MoodEntry> findMonthlyStatus(String email) {
         log.warn("findMonthlyStatus is deprecated. Use getMonthlyMood instead.");

@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.sql.ConnectionBuilder;
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "meditation_sessions")
@@ -35,9 +36,14 @@ public class MeditationSession extends BaseEntity {
     @Column(nullable = false)
     private boolean completed = false;
 
-    private Integer minutes;
+    private Integer durationMinutes;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @Column(name = "progress_percentage")
+    private Integer progressPercentage = 0;
 
 
-    private Instant completedAt;
 
 }

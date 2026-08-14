@@ -9,15 +9,10 @@ import lombok.NoArgsConstructor;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class MeditationList {
-private Long id;
-
-private String title;
-
-private String thumbnail;
-
-private String duration;
-private String category;
-private String time;
-
-    }
+public class MeditationStatistics {
+    private Long totalMeditations;
+    private Long totalSessions;
+    private Long totalMinutes;
+    private Long currentStreak;
+    private Long longestStreak;
+}

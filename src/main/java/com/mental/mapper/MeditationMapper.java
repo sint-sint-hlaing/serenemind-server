@@ -1,3 +1,4 @@
+// MeditationMapper.java
 package com.mental.mapper;
 
 import com.mental.dto.meditation.MeditationList;
@@ -17,27 +18,36 @@ public class MeditationMapper {
                 .id(meditation.getId())
                 .title(meditation.getTitle())
                 .description(meditation.getDescription())
-                .category(meditation.getCategories().name())
+                .category(meditation.getCategory() != null ?
+                        meditation.getCategory().name() : null)
+                .time(meditation.getTimeOfDay() != null ?
+                        meditation.getTimeOfDay().name() : null)
                 .duration(meditation.getDuration())
+                .durationSeconds(meditation.getDurationSeconds())
                 .audioUrl(meditation.getAudioUrl())
                 .imageUrl(meditation.getImageUrl())
+                .difficulty(meditation.getDifficulty())
+                .premium(meditation.getPremium())
+                .listenCount(meditation.getListenCount())
+                .favoriteCount(meditation.getFavoriteCount())
+                .favorite(false) // Default, will be set by service
                 .build();
     }
-    public MeditationList toListResponse(Meditation meditation) {
 
+    public MeditationList toListResponse(Meditation meditation) {
         if (meditation == null) {
             return null;
         }
 
-
         return MeditationList.builder()
                 .id(meditation.getId())
                 .title(meditation.getTitle())
-
                 .thumbnail(meditation.getImageUrl())
-
                 .duration(meditation.getDuration())
-
+                .category(meditation.getCategory() != null ?
+                        meditation.getCategory().name() : null)
+                .time(meditation.getTimeOfDay() != null ?
+                        meditation.getTimeOfDay().name() : null)
                 .build();
     }
 }

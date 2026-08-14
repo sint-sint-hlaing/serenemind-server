@@ -5,5 +5,6 @@ public enum MeditationCategory {
     SLEEP,
     ANXIETY,
     FOCUS,
-    BREATHING
+    BREATHING,
+    STRESS
 }

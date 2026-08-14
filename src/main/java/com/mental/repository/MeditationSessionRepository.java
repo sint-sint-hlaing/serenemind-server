@@ -10,7 +10,9 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MeditationSessionRepository
@@ -47,4 +49,25 @@ public interface MeditationSessionRepository
     """, nativeQuery = true)
     List<Object[]> findMeditationTrend();
 
+    List<MeditationSession> findByUserAndCompletedTrueOrderByCompletedAtDesc(User user);
+
+    @Query("SELECT ms FROM MeditationSession ms WHERE ms.user = :user ORDER BY ms.completedAt DESC LIMIT 10")
+    List<MeditationSession> findRecentSessions(@Param("user") User user);
+
+    Optional<MeditationSession> findByUserAndMeditationId(User user, Long meditationId);
+
+    @Query("SELECT COUNT(ms) FROM MeditationSession ms WHERE ms.meditation.id = :meditationId AND ms.completed = true")
+    Long countCompletedSessions(@Param("meditationId") Long meditationId);
+
+    @Query("SELECT ms.meditation FROM MeditationSession ms WHERE ms.user = :user AND ms.completed = true ORDER BY ms.completedAt DESC")
+    List<Meditation> findCompletedMeditationsByUser(@Param("user") User user);
+
+
+    @Query("SELECT COALESCE(SUM(ms.durationMinutes), 0) FROM MeditationSession ms")
+    Long sumDurationMinutes();
+
+    List<MeditationSession> findByUserAndCompletedTrue(User user);
+
+    @Query("SELECT ms FROM MeditationSession ms WHERE ms.user = :user AND ms.completed = false")
+    List<MeditationSession> findIncompleteSessionsByUser(User user);
 }
