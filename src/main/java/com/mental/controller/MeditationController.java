@@ -1,7 +1,9 @@
 package com.mental.controller;
 
-import com.mental.dto.MeditationSessionRequest;
+import com.mental.dto.meditation.MeditationSessionRequest;
 import com.mental.dto.meditation.*;
+import com.mental.model.entity.enums.MeditationCategory;
+import com.mental.model.entity.enums.MeditationTime;
 import com.mental.security.UserPrincipal;
 import com.mental.service.MeditationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,9 +39,11 @@ public class MeditationController {
 
     @Operation(summary = "Get meditation by ID")
     @GetMapping("/{id}")
-    public ResponseEntity<MeditationResponse> getById(@PathVariable Long id) {
+    public ResponseEntity<MeditationResponse> getById(
+            @AuthenticationPrincipal UserPrincipal principal, @PathVariable Long id) {
         log.debug("Fetching meditation by id: {}", id);
-        return ResponseEntity.ok(meditationService.getById(id));
+        Long userId = principal != null ? principal.getId() : null;
+        return ResponseEntity.ok(meditationService.getById(id,userId));
     }
 
     @Operation(summary = "Complete a meditation session")
@@ -54,34 +58,96 @@ public class MeditationController {
 
     @Operation(summary = "Get meditation history")
     @GetMapping("/history")
-    public ResponseEntity<List<MeditationResponse>> history(
+    public ResponseEntity<List<MeditationHistoryResponse>> history(
             @AuthenticationPrincipal UserPrincipal principal) {
         log.debug("Fetching meditation history for user: {}", principal.getEmail());
         return ResponseEntity.ok(meditationService.getHistory(principal.getEmail()));
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> downloadAudio(@PathVariable Long id) {
+    public ResponseEntity<Resource> downloadAudio(
+            @PathVariable Long id) {
 
-        Resource resource = (Resource) meditationService.downloadAudio(id);
+        Resource resource = meditationService.downloadAudio(id);
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" + resource.getFilename() + "\"")
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" +
+                                resource.getFilename() +
+                                "\""
+                )
                 .contentType(MediaType.parseMediaType("audio/mpeg"))
                 .body(resource);
     }
     @PostMapping("/{id}/favorite")
     public ResponseEntity<FavoriteResponse> toggleFavorite(
             @PathVariable Long id,
-            UserPrincipal principal) {
-
+            @AuthenticationPrincipal UserPrincipal principal) {
 
         return ResponseEntity.ok(
                 meditationService.toggleFavorite(principal.getId(), id));
     }
 
+    @Operation(summary = "Get meditations by category")
+    @GetMapping("/category/{category}")
+    public ResponseEntity<List<MeditationResponse>> getByCategory(
+            @PathVariable String category) {
 
+        MeditationCategory meditationCategory =
+                MeditationCategory.valueOf(category.toUpperCase());
+
+        return ResponseEntity.ok(
+                meditationService.getByCategory(meditationCategory)
+        );
+    }
+
+
+    @Operation(summary = "Get meditations by time")
+    @GetMapping("/time/{time}")
+    public ResponseEntity<List<MeditationResponse>> getByTime(
+            @PathVariable String time) {
+
+        MeditationTime meditationTime =
+                MeditationTime.valueOf(time.toUpperCase());
+
+        return ResponseEntity.ok(
+                meditationService.getByTime(meditationTime)
+        );
+    }
+    @Operation(summary = "Search meditations")
+    @GetMapping("/search")
+    public ResponseEntity<List<MeditationResponse>> search(
+            @RequestParam(required = false) String query,
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String time) {
+
+        MeditationCategory meditationCategory = null;
+        MeditationTime meditationTime = null;
+
+        if (category != null && !category.isBlank()) {
+            meditationCategory =
+                    MeditationCategory.valueOf(category.toUpperCase());
+        }
+
+        if (time != null && !time.isBlank()) {
+            meditationTime =
+                    MeditationTime.valueOf(time.toUpperCase());
+        }
+
+        log.debug(
+                "Searching meditations. query={}, category={}, time={}",
+                query, meditationCategory, meditationTime
+        );
+
+        return ResponseEntity.ok(
+                meditationService.search(
+                        query,
+                        meditationCategory,
+                        meditationTime
+                )
+        );
+    }
 
     @PostMapping("/{id}/timer")
     public ResponseEntity<TimerResponse> saveTimer(
@@ -123,12 +189,13 @@ public class MeditationController {
     public ResponseEntity<Resource> stream(
             @PathVariable Long id) {
 
-        Resource resource = (Resource) meditationService.stream(id);
+        Resource resource = (Resource) meditationService.streamAudio(id);
 
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType("audio/mpeg"))
                 .body(resource);
     }
+
 
 }
 

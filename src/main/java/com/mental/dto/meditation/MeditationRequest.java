@@ -1,5 +1,6 @@
 package com.mental.dto.meditation;
 
+import com.mental.model.entity.enums.MeditationTime;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -21,6 +22,8 @@ public record MeditationRequest(
         @NotNull(message = "Difficulty is required")
         Integer difficulty,
         MultipartFile audioFile,
-        MultipartFile imageFile
+        MultipartFile imageFile,
+        @NotNull(message = "Time of day is required")
+        MeditationTime timeofDay
 ) {
 }

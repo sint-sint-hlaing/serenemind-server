@@ -1,31 +1,37 @@
+// MeditationService.java - Complete Fixed Version
 package com.mental.service;
 
-import com.mental.dto.MeditationSessionRequest;
+import com.mental.dto.meditation.MeditationSessionRequest;
 import com.mental.dto.meditation.*;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.mapper.MeditationMapper;
-import com.mental.model.entity.Favorite;
 import com.mental.model.entity.Meditation;
 import com.mental.model.entity.MeditationSession;
 import com.mental.model.entity.User;
+import com.mental.model.entity.enums.MeditationCategory;
+import com.mental.model.entity.enums.MeditationStatus;
+import com.mental.model.entity.enums.MeditationTime;
 import com.mental.repository.FavoriteRepository;
 import com.mental.repository.MeditationRepository;
 import com.mental.repository.MeditationSessionRepository;
 import com.mental.repository.UserRepository;
-import com.nimbusds.jose.util.Resource;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -38,48 +44,137 @@ public class MeditationService {
     private final UserRepository userRepository;
     private final MeditationMapper meditationMapper;
     private final FavoriteRepository favoriteRepository;
-    private final MeditationSessionRepository  meditationSessionRepository;
 
+    // ===== CATEGORY MAP with emojis =====
+    private static final Map<MeditationCategory, MeditationCategoryResponse> CATEGORY_MAP = new HashMap<>();
+    static {
+        CATEGORY_MAP.put(MeditationCategory.RELAXATION,
+                new MeditationCategoryResponse("RELAXATION", "Relaxation", "🧘", "Find peace and calm"));
+        CATEGORY_MAP.put(MeditationCategory.SLEEP,
+                new MeditationCategoryResponse("SLEEP", "Sleep", "💤", "Drift into deep sleep"));
+        CATEGORY_MAP.put(MeditationCategory.ANXIETY,
+                new MeditationCategoryResponse("ANXIETY", "Anxiety Relief", "😌", "Calm your mind"));
+        CATEGORY_MAP.put(MeditationCategory.FOCUS,
+                new MeditationCategoryResponse("FOCUS", "Focus", "🎯", "Sharpen your concentration"));
+        CATEGORY_MAP.put(MeditationCategory.BREATHING,
+                new MeditationCategoryResponse("BREATHING", "Breathing", "🌬️", "Master your breath"));
+        CATEGORY_MAP.put(MeditationCategory.STRESS,
+                new MeditationCategoryResponse("STRESS", "Stress Relief", "🌿", "Release tension"));
+    }
+
+    // ===== TIME MAP with emojis =====
+    private static final Map<MeditationTime, MeditationTimeResponse> TIME_MAP = new HashMap<>();
+    static {
+        TIME_MAP.put(MeditationTime.MORNING,
+                new MeditationTimeResponse("MORNING", "Morning", "🌅", "Start your day right"));
+        TIME_MAP.put(MeditationTime.AFTERNOON,
+                new MeditationTimeResponse("AFTERNOON", "Afternoon", "☀️", "Midday refresh"));
+        TIME_MAP.put(MeditationTime.EVENING,
+                new MeditationTimeResponse("EVENING", "Evening", "🌆", "Wind down"));
+        TIME_MAP.put(MeditationTime.NIGHT,
+                new MeditationTimeResponse("NIGHT", "Night", "🌙", "Peaceful sleep"));
+    }
+
+    // ===== GET ALL MEDITATIONS =====
     @Transactional(readOnly = true)
     public List<MeditationResponse> getAll() {
         log.debug("Fetching all meditations");
         return meditationRepository.findAll()
                 .stream()
                 .map(meditationMapper::toResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
+    // ===== GET BY ID =====
     @Transactional(readOnly = true)
-    public MeditationResponse getById(Long id) {
+    public MeditationResponse getById(Long id, Long userId) {
         log.debug("Fetching meditation by id: {}", id);
+
         Meditation meditation = meditationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Meditation not found with id: " + id));
-        return meditationMapper.toResponse(meditation);
+
+        // Increment view count
+        meditation.setViewCount(meditation.getViewCount() + 1);
+        meditationRepository.save(meditation);
+
+        MeditationResponse response = meditationMapper.toResponse(meditation);
+
+        // Check if user has favorited
+        if (userId != null) {
+            User user = userRepository.findById(userId).orElse(null);
+            if (user != null) {
+                boolean isFavorite = favoriteRepository.existsByUserAndMeditation(user, meditation);
+                response.setFavorite(isFavorite);
+            }
+        }
+
+        return response;
     }
 
+    // ===== DASHBOARD =====
     @Transactional(readOnly = true)
     public MeditationDashboardResponse getDashboard() {
         log.debug("Fetching meditation dashboard");
+        Pageable limit = PageRequest.of(0, 10);
 
-        List<Meditation> meditations = meditationRepository.findAll();
-
-        List<MeditationResponse> recommended = meditations.stream()
+        // Get featured meditations
+        List<MeditationResponse> featured = meditationRepository
+                .findByStatusAndFeaturedTrueOrderByListenCountDesc(MeditationStatus.PUBLISHED)
+                .stream()
+                .limit(5)
                 .map(meditationMapper::toResponse)
-                .toList();
+                .collect(Collectors.toList());
 
-        MeditationResponse featured = recommended.isEmpty() ? null : recommended.get(0);
+        // Get popular meditations
+        List<MeditationResponse> popular = meditationRepository
+                .findPopularMeditations(limit)
+                .stream()
+                .map(meditationMapper::toResponse)
+                .collect(Collectors.toList());
 
-        List<MeditationCategoryResponse> categories = meditations.stream()
-                .map(m -> new MeditationCategoryResponse(
-                        m.getCategories().name(),
-                        getCategoryEmoji(m.getCategories().name())
-                ))
-                .distinct()
-                .toList();
+        // Get recent meditations
+        List<MeditationResponse> recent = meditationRepository
+                .findRecentMeditations(limit)
+                .stream()
+                .map(meditationMapper::toResponse)
+                .collect(Collectors.toList());
 
-        return new MeditationDashboardResponse(featured, categories, recommended);
+        // Get statistics
+        MeditationStatistics statistics = getStatistics();
+
+        return MeditationDashboardResponse.builder()
+                .categories(CATEGORY_MAP.values().stream().collect(Collectors.toList()))
+                .times(TIME_MAP.values().stream().collect(Collectors.toList()))
+                .featured(featured)
+                .popular(popular)
+                .recent(recent)
+                .statistics(statistics)
+                .build();
     }
 
+    // ===== STATISTICS =====
+    @Transactional(readOnly = true)
+    public MeditationStatistics getStatistics() {
+        log.debug("Fetching meditation statistics");
+
+        long totalMeditations = meditationRepository.countByStatus(MeditationStatus.PUBLISHED);
+        long totalSessions = sessionRepository.count();
+        Long totalMinutes = sessionRepository.sumDurationMinutes();
+
+        if (totalMinutes == null) {
+            totalMinutes = 0L;
+        }
+
+        return MeditationStatistics.builder()
+                .totalMeditations(totalMeditations)
+                .totalSessions(totalSessions)
+                .totalMinutes(totalMinutes)
+                .currentStreak(0L)
+                .longestStreak(0L)
+                .build();
+    }
+
+    // ===== COMPLETE SESSION =====
     @Transactional
     public void completeSession(String email, MeditationSessionRequest request) {
         log.info("Completing meditation session for user: {}", email);
@@ -90,155 +185,197 @@ public class MeditationService {
         Meditation meditation = meditationRepository.findById(request.getMeditationId())
                 .orElseThrow(() -> new ResourceNotFoundException("Meditation not found with id: " + request.getMeditationId()));
 
-        MeditationSession session = MeditationSession.builder()
-                .user(user)
-                .meditation(meditation)
-                .completed(request.isCompleted())
-                .completedAt(request.isCompleted() ? Instant.now() : null)
-                .build();
+        // Update listen count
+        meditation.setListenCount(meditation.getListenCount() + 1);
+        meditationRepository.save(meditation);
+
+        // Create or update session
+        MeditationSession session = sessionRepository
+                .findByUserAndMeditationId(user, meditation.getId())
+                .orElse(MeditationSession.builder()
+                        .user(user)
+                        .meditation(meditation)
+                        .build());
+        Integer progressPercentage = calculateProgress(
+                request.getDurationMinutes(),
+                meditation.getTotalDurationMinutes(), // You need this field
+                request.isCompleted()
+        );
+
+
+        session.setCompleted(request.isCompleted());
+        session.setDurationMinutes(request.getDurationMinutes());
+        session.setProgressPercentage(progressPercentage); // Set calculated value
+        session.setCompletedAt(LocalDateTime.now());
 
         sessionRepository.save(session);
-        log.info("Meditation session completed successfully for user: {}", email);
+
+        log.info("Meditation session completed for user: {}, meditation: {}", email, meditation.getTitle());
+    }
+    @Transactional(readOnly = true)
+    public List<MeditationResponse> search(String query, MeditationCategory category, MeditationTime time) {
+        log.debug("Searching meditations. query={}, category={}, time={}", query, category, time);
+
+        // ✅ FIXED: Use the combined search method with all three parameters
+        // Clean the query
+        String cleanQuery = (query != null && !query.isBlank()) ? query.trim() : null;
+
+        // Use the combined search method (this handles all cases)
+        return meditationRepository.search(cleanQuery, category, time)
+                .stream()
+                .map(meditationMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
+    // ===== GET HISTORY =====
     @Transactional(readOnly = true)
-    public List<MeditationResponse> getHistory(String email) {
+    public List<MeditationHistoryResponse> getHistory(String email) {
         log.debug("Fetching meditation history for user: {}", email);
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        return sessionRepository.findByUserOrderByCreatedAtDesc(user)
+        return sessionRepository.findByUserAndCompletedTrueOrderByCompletedAtDesc(user)
                 .stream()
-                .map(session -> meditationMapper.toResponse(session.getMeditation()))
-                .toList();
+                .map(this::mapToHistoryResponse)
+                .collect(Collectors.toList());
     }
 
+    // ===== GET RECOMMENDATIONS =====
     @Transactional(readOnly = true)
     public List<MeditationResponse> getRecommendations(Long userId) {
         log.debug("Fetching recommendations for user: {}", userId);
-        return meditationRepository.findRecommendedMeditations(userId)
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Get user's completed meditations categories
+        List<MeditationCategory> userCategories = sessionRepository
+                .findByUserAndCompletedTrue(user)
+                .stream()
+                .map(session -> session.getMeditation().getCategory())
+                .distinct()
+                .collect(Collectors.toList());
+
+        // If user has completed meditations, recommend from same categories
+        if (!userCategories.isEmpty()) {
+            return meditationRepository
+                    .findByCategoryAndStatus(userCategories.get(0), MeditationStatus.PUBLISHED)
+                    .stream()
+                    .limit(10)
+                    .map(meditationMapper::toResponse)
+                    .collect(Collectors.toList());
+        }
+
+        // Fallback: return popular meditations
+        return meditationRepository
+                .findPopularMeditations(PageRequest.of(0, 10))
                 .stream()
                 .map(meditationMapper::toResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
-    @Transactional(readOnly = true)
-    public List<MeditationResponse> search(String keyword) {
-        log.debug("Searching meditations with keyword: {}", keyword);
-        return meditationRepository.searchByKeyword(keyword)
-                .stream()
-                .map(meditationMapper::toResponse)
-                .toList();
-    }
-
+    // ===== CONTINUE LISTENING =====
     @Transactional(readOnly = true)
     public List<MeditationResponse> getContinueListening(Long userId) {
         log.debug("Fetching continue listening for user: {}", userId);
-        return sessionRepository.findContinueListening(userId)
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return sessionRepository
+                .findIncompleteSessionsByUser(user)
+                .stream()
+                .map(session -> meditationMapper.toResponse(session.getMeditation()))
+                .collect(Collectors.toList());
+    }
+
+
+
+    // ===== GET BY CATEGORY =====
+    @Transactional(readOnly = true)
+    public List<MeditationResponse> getByCategory(MeditationCategory category) {
+        log.debug("Fetching meditations by category: {}", category);
+
+        return meditationRepository.findByCategory(category)
                 .stream()
                 .map(meditationMapper::toResponse)
-                .toList();
+                .collect(Collectors.toList());
     }
 
-    private String getCategoryEmoji(String category) {
-        return switch(category.toUpperCase()) {
-            case "MINDFULNESS" -> "🧘";
-            case "SLEEP" -> "😴";
-            case "ANXIETY" -> "🌿";
-            case "FOCUS" -> "🎯";
-            case "STRESS" -> "💆";
-            default -> "🧘";
-        };
+    // ===== GET BY TIME =====
+    @Transactional(readOnly = true)
+    public List<MeditationResponse> getByTime(MeditationTime time) {
+        log.debug("Fetching meditations by time: {}", time);
+
+        return meditationRepository.findByTimeOfDay(time)
+                .stream()
+                .map(meditationMapper::toResponse)
+                .collect(Collectors.toList());
     }
 
-    public Resource downloadAudio(Long id) {
-
-        Meditation meditation = meditationRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResourceNotFoundException("Meditation not found"));
-
-        try {
-
-            Path path = Paths.get(meditation.getAudioUrl());
-
-            org.springframework.core.io.Resource resource = new UrlResource(path.toUri());
-
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new RuntimeException("Audio file not found.");
-            }
-
-            return (Resource) resource;
-
-        } catch (MalformedURLException e) {
-            throw new RuntimeException("Cannot download audio.", e);
-        }
-    }
-
+    // ===== TOGGLE FAVORITE =====
     @Transactional
-    public FavoriteResponse toggleFavorite(Long id, Long meditationId) {
-        Optional<Favorite> favorite =
-                favoriteRepository.findByUserIdAndMeditationId(id, meditationId);
+    public FavoriteResponse toggleFavorite(Long userId, Long meditationId) {
+        log.info("Toggling favorite for user: {}, meditation: {}", userId, meditationId);
 
-        if (favorite.isPresent()) {
-
-            favoriteRepository.delete(favorite.get());
-
-            return new FavoriteResponse(
-                    false,
-                    "Removed from favorites");
-
-        }
-
-        User user = userRepository.findById(id)
-                .orElseThrow();
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Meditation meditation = meditationRepository.findById(meditationId)
-                .orElseThrow();
+                .orElseThrow(() -> new ResourceNotFoundException("Meditation not found"));
 
-        Favorite newFavorite = new Favorite();
-        newFavorite.setUser(user);
-        newFavorite.setMeditation(meditation);
+        boolean isFavorite = favoriteRepository.existsByUserAndMeditation(user, meditation);
 
-        favoriteRepository.save(newFavorite);
-
-        return new FavoriteResponse(
-                true,
-                "Added to favorites");
+        if (isFavorite) {
+            favoriteRepository.deleteByUserAndMeditation(user, meditation);
+            meditation.setFavoriteCount(Math.max(0, meditation.getFavoriteCount() - 1));
+            meditationRepository.save(meditation);
+            return new FavoriteResponse(false, "Removed from favorites");
+        } else {
+            com.mental.model.entity.Favorite favorite = com.mental.model.entity.Favorite.builder()
+                    .user(user)
+                    .meditation(meditation)
+                    .build();
+            favoriteRepository.save(favorite);
+            meditation.setFavoriteCount(meditation.getFavoriteCount() + 1);
+            meditationRepository.save(meditation);
+            return new FavoriteResponse(true, "Added to favorites");
+        }
     }
 
-        public TimerResponse saveTimer(
-                Long userId,
-                Long meditationId,
-                TimerRequest request) {
+    // ===== SAVE TIMER =====
+    @Transactional
+    public TimerResponse saveTimer(Long userId, Long meditationId, TimerRequest request) {
+        log.info("Saving timer for user: {}, meditation: {}, minutes: {}", userId, meditationId, request.getMinutes());
 
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-            MeditationSession timer =
-                    new MeditationSession();
+        Meditation meditation = meditationRepository.findById(meditationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Meditation not found"));
 
+        MeditationSession session = sessionRepository
+                .findByUserAndMeditationId(user, meditationId)
+                .orElse(MeditationSession.builder()
+                        .user(user)
+                        .meditation(meditation)
+                        .build());
 
-            timer.setMinutes(request.getMinutes());
+        session.setDurationMinutes(request.getMinutes());
+        session.setCompleted(false);
+        session.setProgressPercentage(0);
+        session.setCompletedAt(null);
+        sessionRepository.save(session);
 
+        return new TimerResponse(request.getMinutes(), "Timer set for " + request.getMinutes() + " minutes");
+    }
 
-            timer.setUser(
-                    userRepository.findById(userId)
-                            .orElseThrow());
-
-
-            timer.setMeditation(
-                    meditationRepository.findById(meditationId)
-                            .orElseThrow());
-
-
-            meditationSessionRepository.save(timer);
-
-
-            return new TimerResponse(
-                    request.getMinutes(),
-                    "Timer saved successfully");
-        }
-
+    // ===== GET SHARE LINK =====
+    @Transactional(readOnly = true)
     public ShareResponse getShareLink(Long id) {
+        log.debug("Getting share link for meditation: {}", id);
+
         Meditation meditation = meditationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Meditation not found"));
 
@@ -250,62 +387,114 @@ public class MeditationService {
                 .build();
     }
 
+    // ===== GET PREVIOUS =====
+    @Transactional(readOnly = true)
     public MeditationResponse getPrevious(Long id) {
-        Meditation meditation =
-                meditationRepository
-                        .findFirstByIdLessThanOrderByIdDesc(id)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException("Previous meditation not found"));
+        log.debug("Getting previous meditation for id: {}", id);
+
+        Meditation meditation = meditationRepository
+                .findFirstByIdLessThanOrderByIdDesc(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Previous meditation not found"));
 
         return meditationMapper.toResponse(meditation);
     }
 
+    // ===== GET NEXT =====
+    @Transactional(readOnly = true)
     public MeditationList getNext(Long id) {
+        log.debug("Getting next meditation for id: {}", id);
 
-
-        Meditation meditation =
-                meditationRepository
-                        .findFirstByIdGreaterThanOrderByIdAsc(id)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Next meditation not found"));
-
+        Meditation meditation = meditationRepository
+                .findFirstByIdGreaterThanOrderByIdAsc(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Next meditation not found"));
 
         return meditationMapper.toListResponse(meditation);
     }
 
-    public Resource stream(Long id) {
+    // ===== STREAM AUDIO =====
+    @Transactional(readOnly = true)
+    public Resource streamAudio(Long id) {
 
+        log.debug("Streaming audio for meditation: {}", id);
 
-        Meditation meditation =
-                meditationRepository.findById(id)
-                        .orElseThrow(() ->
-                                new ResourceNotFoundException(
-                                        "Meditation not found"));
+        Meditation meditation = meditationRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Meditation not found"));
 
+        String audioUrl = meditation.getAudioUrl();
+
+        if (audioUrl == null || audioUrl.isBlank()) {
+            throw new ResourceNotFoundException("Audio URL not found");
+        }
 
         try {
-
-            Path path =
-                    Paths.get(meditation.getAudioUrl());
-
-
-            org.springframework.core.io.Resource resource =
-                    new UrlResource(path.toUri());
-
-
-            if (!resource.exists()) {
-                throw new RuntimeException(
-                        "Audio file not found");
-            }
-
-
-            return (Resource) resource;
-
+            return new UrlResource(audioUrl);
 
         } catch (MalformedURLException e) {
-
-            throw new RuntimeException(e);
+            log.error("Invalid audio URL for meditation {}: {}", id, audioUrl, e);
+            throw new RuntimeException("Invalid audio URL", e);
         }
+    }
+
+    // ===== DOWNLOAD AUDIO =====
+    @Transactional(readOnly = true)
+    public Resource downloadAudio(Long id) {
+        log.debug("Downloading audio for meditation: {}", id);
+
+        Meditation meditation = meditationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Meditation not found"));
+
+        try {
+            String audioUrl = meditation.getAudioUrl();
+            if (audioUrl == null || audioUrl.isBlank()) {
+                throw new RuntimeException("Audio URL is empty");
+            }
+
+            Resource resource = new UrlResource(audioUrl);
+
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new RuntimeException("Audio file not found");
+            }
+
+            return resource;
+        } catch (MalformedURLException e) {
+            log.error("Invalid audio URL for meditation {}: {}", id, e.getMessage());
+            throw new RuntimeException("Invalid audio URL: " + meditation.getAudioUrl(), e);
+        }
+    }
+
+    // ===== MAPPERS =====
+    private MeditationHistoryResponse mapToHistoryResponse(MeditationSession session) {
+        return MeditationHistoryResponse.builder()
+                .id(session.getId())
+                .title(session.getMeditation().getTitle())
+                .category(session.getMeditation().getCategory() != null ?
+                        session.getMeditation().getCategory().name() : null)
+                .duration(session.getDurationMinutes())
+                .completed(session.isCompleted())
+                .progressPercentage(session.getProgressPercentage())
+                .completedAt(session.getCompletedAt())
+                .imageUrl(session.getMeditation().getImageUrl())
+                .build();
+    }
+    private Integer calculateProgress(Integer completedMinutes, Integer totalMinutes, boolean isCompleted) {
+        // If marked as completed, it's 100%
+        if (isCompleted) {
+            return 100;
+        }
+
+        // If no duration data, return 0
+        if (completedMinutes == null || completedMinutes <= 0) {
+            return 0;
+        }
+
+        // If meditation has no total duration defined, treat any duration as progress
+        if (totalMinutes == null || totalMinutes <= 0) {
+            return Math.min(100, completedMinutes * 5); // e.g., 5% per minute
+        }
+
+        // Calculate percentage based on time
+        int percentage = (completedMinutes * 100) / totalMinutes;
+        return Math.min(100, percentage);
     }
 }

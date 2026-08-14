@@ -29,4 +29,6 @@ public interface UserRepository
     long countByCreatedAtBetween(LocalDateTime localDateTime, LocalDateTime now);
 
     long countByIsActiveTrue();
+
+    boolean existsByEmail(String username);
 }

@@ -1,6 +1,6 @@
 package com.mental.service;
 
-import com.mental.dto.Streak.StreakResponse;
+import com.mental.dto.Steak.StreakResponse;
 import com.mental.model.entity.User;
 import com.mental.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

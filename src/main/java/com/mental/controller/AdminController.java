@@ -4,6 +4,7 @@ import com.mental.dto.Notification.NotificationRequest;
 import com.mental.dto.Post.PostResponse;
 import com.mental.dto.UserDto;
 import com.mental.dto.admin.*;
+import com.mental.dto.goal.GoalResponse;
 import com.mental.dto.goal.UserGoal;
 import com.mental.dto.meditation.MeditationRequest;
 import com.mental.dto.report.ReportDto;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -76,7 +78,17 @@ public class AdminController {
     @PostMapping("/meditations")
     public ResponseEntity<MeditationAdminDto> createMeditation(
             @Valid @ModelAttribute MeditationRequest request) {
-        log.info("Creating new meditation: {}", request.title());
+
+        log.info("=== Creating meditation ===");
+        log.info("Title: {}", request.title());
+        log.info("Audio file: {}", request.audioFile() != null ? request.audioFile().getOriginalFilename() : "null");
+        log.info("Image file: {}", request.imageFile() != null ? request.imageFile().getOriginalFilename() : "null");
+
+        if (request.audioFile() == null) {
+            log.error("Audio file is null!");
+            throw new IllegalArgumentException("Audio file is required");
+        }
+
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(adminMeditationService.createMeditation(request));
     }
@@ -85,7 +97,7 @@ public class AdminController {
 
     @Operation(summary = "Get all goals")
     @GetMapping("/goals")
-    public ResponseEntity<List<UserGoal>> getGoals() {
+    public ResponseEntity<List<GoalResponse>> getGoals() {
         log.info("Fetching all goals");
         return ResponseEntity.ok(adminGoalService.getGoals());
     }

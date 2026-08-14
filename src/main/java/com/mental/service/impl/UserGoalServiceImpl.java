@@ -1,19 +1,16 @@
+// UserGoalServiceImpl.java
 package com.mental.service.impl;
 
-
-import com.mental.dto.goal.UserGoal;  // DTO - Record
-
-// ✅ Entity ကို import မလုပ်ဘဲ Fully Qualified Name သုံးပါ
-// import com.mental.model.entity.UserGoal;  // ❌ မသုံးပါနှင့်
-
-import com.mental.dto.goal.GoalRequest;
-import com.mental.dto.goal.GoalStatistics;
+import com.mental.dto.goal.*;
+import com.mental.dto.goal.UserGoal;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.exception.ValidationException;
 import com.mental.mapper.UserGoalMapper;
-import com.mental.model.entity.User;
-import com.mental.model.entity.UserStreak;
+import com.mental.model.entity.*;
+import com.mental.model.entity.enums.Frequency;
 import com.mental.model.entity.enums.GoalStatus;
+import com.mental.repository.GoalNoteRepository;
+import com.mental.repository.GoalProgressRepository;
 import com.mental.repository.UserGoalRepository;
 import com.mental.repository.UserRepository;
 import com.mental.repository.UserStreakRepository;
@@ -24,7 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -35,80 +35,149 @@ public class UserGoalServiceImpl implements UserGoalService {
     private final UserGoalRepository goalRepository;
     private final UserStreakRepository streakRepository;
     private final UserRepository userRepository;
+    private final GoalProgressRepository progressRepository;
+    private final GoalNoteRepository noteRepository;
     private final UserGoalMapper goalMapper;
 
+    // ===== CREATE GOAL =====
     @Override
-    public UserGoal createGoal(String email, GoalRequest request) {
+    public GoalResponse createGoal(String email, GoalRequest request) {
         log.info("Creating goal for user: {}", email);
 
         validateGoalRequest(request);
-
         User user = getUserByEmail(email);
-        LocalDate targetDate = LocalDate.now().plusDays(request.getTargetDays());
 
+        LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : LocalDate.now();
+        LocalDate targetDate = startDate.plusDays(request.getTargetDays());
 
         com.mental.model.entity.UserGoal entity = com.mental.model.entity.UserGoal.builder()
                 .user(user)
                 .title(request.getTitle().trim())
                 .description(request.getDescription() != null ? request.getDescription().trim() : null)
+                .frequency(request.getFrequency() != null ? request.getFrequency() : Frequency.DAILY)
                 .targetDays(request.getTargetDays())
+                .unit(request.getUnit() != null ? request.getUnit() : "days")
+                .startDate(startDate)
                 .targetDate(targetDate)
+                .icon(request.getIcon() != null ? request.getIcon() : "📚")
+                .silentMode(request.getSilentMode() != null ? request.getSilentMode() : false)
                 .progress(0)
+                .streak(0)
                 .status(GoalStatus.ACTIVE)
                 .build();
-
 
         com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
         log.info("Goal created successfully with id: {}", saved.getId());
 
+        // Initialize progress history
+        initializeProgress(saved);
 
-        return goalMapper.toDto(saved);
+        return goalMapper.toResponseDto(saved);
     }
 
+    private void initializeProgress(com.mental.model.entity.UserGoal goal) {
+        LocalDate startDate = goal.getStartDate() != null ? goal.getStartDate() : LocalDate.now();
+        LocalDate currentDate = LocalDate.now();
+
+        List<GoalProgress> progressList = new ArrayList<>();
+        LocalDate date = startDate;
+        while (!date.isAfter(currentDate)) {
+            GoalProgress progress = GoalProgress.builder()
+                    .goal(goal)
+                    .date(date)
+                    .completed(false)
+                    .value(0.0)
+                    .build();
+            progressList.add(progress);
+            date = date.plusDays(1);
+        }
+        progressRepository.saveAll(progressList);
+    }
+
+    // ===== UPDATE PROGRESS =====
     @Override
-    public UserGoal updateProgress(Long id, String email) {
+    public GoalResponse updateProgress(Long id, String email) {
         log.info("Updating progress for goal: {} by user: {}", id, email);
 
-
         com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
-
         validateGoalStatusForUpdate(entity);
 
+        // Check if already updated today
         if (!canUpdateProgress(entity)) {
             log.debug("Progress already updated today for goal: {}", id);
-            return goalMapper.toDto(entity);
+            return goalMapper.toResponseDto(entity);
         }
 
+        // Increment progress
         incrementProgress(entity);
+
+        // Update streak
         updateStreak(entity.getUser());
 
+        // Update today's progress
+        updateTodayProgress(entity);
+
+        // Check if goal is completed
         if (entity.getProgress() >= entity.getTargetDays()) {
             completeGoalInternal(entity);
         }
+
+        // Update streak count in goal
+        entity.setStreak(calculateStreak(entity.getId()));
 
         com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
         log.info("Progress updated for goal: {}, new progress: {}/{}",
                 id, entity.getProgress(), entity.getTargetDays());
 
-        return goalMapper.toDto(saved);
+        return goalMapper.toResponseDto(saved);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public List<UserGoal> getUserGoals(String email) {
-        log.debug("Fetching all goals for user: {}", email);
+    private void updateTodayProgress(com.mental.model.entity.UserGoal entity) {
+        LocalDate today = LocalDate.now();
+        GoalProgress progress = progressRepository.findByGoalIdAndDate(entity.getId(), today)
+                .orElseGet(() -> {
+                    GoalProgress newProgress = GoalProgress.builder()
+                            .goal(entity)
+                            .date(today)
+                            .completed(false)
+                            .value(0.0)
+                            .build();
+                    return progressRepository.save(newProgress);
+                });
 
-        User user = getUserByEmail(email);
-
-        List<com.mental.model.entity.UserGoal> entities = goalRepository.findByUser(user);
-
-        return entities.stream()
-                .map(goalMapper::toDto)
-                .toList();
+        progress.setCompleted(true);
+        progress.setValue(1.0);
+        progressRepository.save(progress);
     }
 
+    private int calculateStreak(Long goalId) {
+        List<LocalDate> completedDates = progressRepository.findCompletedDatesByGoalId(goalId);
+        if (completedDates.isEmpty()) return 0;
+
+        int streak = 0;
+        LocalDate today = LocalDate.now();
+
+        // Check if today is completed
+        boolean todayCompleted = completedDates.contains(today);
+        boolean yesterdayCompleted = completedDates.contains(today.minusDays(1));
+
+        if (!todayCompleted && !yesterdayCompleted) {
+            return 0;
+        }
+
+        LocalDate checkDate = todayCompleted ? today : today.minusDays(1);
+
+        while (completedDates.contains(checkDate)) {
+            streak++;
+            checkDate = checkDate.minusDays(1);
+        }
+
+        return streak;
+    }
+
+    // ===== COMPLETE GOAL =====
     @Override
-    public UserGoal completeGoal(Long id, String email) {
+    public GoalResponse completeGoal(Long id, String email) {
         log.info("Completing goal: {} by user: {}", id, email);
 
         com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
@@ -127,11 +196,12 @@ public class UserGoalServiceImpl implements UserGoalService {
         com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
         log.info("Goal {} completed successfully!", id);
 
-        return goalMapper.toDto(saved);
+        return goalMapper.toResponseDto(saved);
     }
 
+    // ===== PAUSE GOAL =====
     @Override
-    public UserGoal pauseGoal(Long id, String email) {
+    public GoalResponse pauseGoal(Long id, String email) {
         log.info("Pausing goal: {} by user: {}", id, email);
 
         com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
@@ -153,11 +223,12 @@ public class UserGoalServiceImpl implements UserGoalService {
         com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
         log.info("Goal {} paused successfully", id);
 
-        return goalMapper.toDto(saved);
+        return goalMapper.toResponseDto(saved);
     }
 
+    // ===== RESUME GOAL =====
     @Override
-    public UserGoal resumeGoal(Long id, String email) {
+    public GoalResponse resumeGoal(Long id, String email) {
         log.info("Resuming goal: {} by user: {}", id, email);
 
         com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
@@ -170,9 +241,10 @@ public class UserGoalServiceImpl implements UserGoalService {
         com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
         log.info("Goal {} resumed successfully", id);
 
-        return goalMapper.toDto(saved);
+        return goalMapper.toResponseDto(saved);
     }
 
+    // ===== DELETE GOAL (Soft Delete) =====
     @Override
     public void deleteGoal(Long id, String email) {
         log.info("Archiving goal: {} by user: {}", id, email);
@@ -189,19 +261,39 @@ public class UserGoalServiceImpl implements UserGoalService {
         log.info("Goal {} archived successfully", id);
     }
 
+    // ===== HARD DELETE GOAL =====
     @Override
     public void hardDeleteGoal(Long id, String email) {
         log.info("Hard deleting goal: {} by user: {}", id, email);
 
         com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
+
+        // Delete associated data
+        progressRepository.deleteByGoalId(id);
+        noteRepository.deleteByGoalId(id);
         goalRepository.delete(entity);
 
         log.info("Goal {} hard deleted successfully", id);
     }
 
+    // ===== GET ALL GOALS =====
     @Override
     @Transactional(readOnly = true)
-    public List<UserGoal> getActiveGoals(String email) {
+    public List<GoalResponse> getUserGoals(String email) {
+        log.debug("Fetching all goals for user: {}", email);
+
+        User user = getUserByEmail(email);
+        List<com.mental.model.entity.UserGoal> entities = goalRepository.findByUser(user);
+
+        return entities.stream()
+                .map(goalMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+
+    // ===== GET ACTIVE GOALS =====
+    @Override
+    @Transactional(readOnly = true)
+    public List<GoalResponse> getActiveGoals(String email) {
         log.debug("Fetching active goals for user: {}", email);
 
         User user = getUserByEmail(email);
@@ -209,36 +301,159 @@ public class UserGoalServiceImpl implements UserGoalService {
         return goalRepository.findByUserAndStatusIn(user,
                         List.of(GoalStatus.ACTIVE, GoalStatus.PAUSED))
                 .stream()
-                .map(goalMapper::toDto)
-                .toList();
+                .map(goalMapper::toResponseDto)
+                .collect(Collectors.toList());
     }
 
+    // ===== GET COMPLETED GOALS =====
     @Override
     @Transactional(readOnly = true)
-    public List<UserGoal> getCompletedGoals(String email) {
+    public List<GoalResponse> getCompletedGoals(String email) {
         log.debug("Fetching completed goals for user: {}", email);
 
         User user = getUserByEmail(email);
 
         return goalRepository.findByUserAndStatus(user, GoalStatus.COMPLETED)
                 .stream()
-                .map(goalMapper::toDto)
-                .toList();
+                .map(goalMapper::toResponseDto)
+                .collect(Collectors.toList());
     }
 
+    // ===== GET GOALS BY STATUS =====
     @Override
     @Transactional(readOnly = true)
-    public List<UserGoal> getGoalsByStatus(String email, GoalStatus status) {
+    public List<GoalResponse> getGoalsByStatus(String email, GoalStatus status) {
         log.debug("Fetching goals for user: {} with status: {}", email, status);
 
         User user = getUserByEmail(email);
 
         return goalRepository.findByUserAndStatus(user, status)
                 .stream()
-                .map(goalMapper::toDto)
-                .toList();
+                .map(goalMapper::toResponseDto)
+                .collect(Collectors.toList());
+    }
+    // ===== GET GOALS FOR DASHBOARD =====
+    @Override
+    @Transactional(readOnly = true)
+    public List<GoalResponse> getGoalsForDashboard(String email) {
+        log.debug("Fetching dashboard goals for user: {}", email);
+        User user = getUserByEmail(email);
+
+        return goalRepository.findTop5ActiveByUser(user)
+                .stream()
+                .map(goalMapper::toResponseDto)
+                .collect(Collectors.toList());
     }
 
+    // ===== GET STATISTICS =====
+    @Override
+    @Transactional(readOnly = true)
+    public GoalStatistics getGoalStatistics(String email) {
+        log.debug("Fetching goal statistics for user: {}", email);
+
+        User user = getUserByEmail(email);
+
+        long total = goalRepository.countByUser(user);
+        long active = goalRepository.countByUserAndStatus(user, GoalStatus.ACTIVE);
+        long paused = goalRepository.countByUserAndStatus(user, GoalStatus.PAUSED);
+        long completed = goalRepository.countByUserAndStatus(user, GoalStatus.COMPLETED);
+        long expired = goalRepository.countByUserAndStatus(user, GoalStatus.EXPIRED);
+        long cancelled = goalRepository.countByUserAndStatus(user, GoalStatus.CANCELLED);
+
+        long totalProgress = calculateTotalProgress(user);
+        int totalStreak = goalRepository.getTotalStreakByUser(user) != null ?
+                goalRepository.getTotalStreakByUser(user) : 0;
+
+        return GoalStatistics.builder()
+                .total(total)
+                .active(active)
+                .paused(paused)
+                .completed(completed)
+                .expired(expired)
+                .cancelled(cancelled)
+                .totalProgress(totalProgress)
+                .completionRate(total > 0 ? (completed * 100.0) / total : 0.0)
+                .totalStreak(totalStreak)
+                .currentStreak(getCurrentStreak(user))
+                .build();
+    }
+
+    private int getCurrentStreak(User user) {
+        List<com.mental.model.entity.UserGoal> activeGoals =
+                goalRepository.findByUserAndStatus(user, GoalStatus.ACTIVE);
+
+        return activeGoals.stream()
+                .mapToInt(com.mental.model.entity.UserGoal::getStreak)
+                .max()
+                .orElse(0);
+    }
+
+    // ===== NOTE MANAGEMENT =====
+    @Override
+    @Transactional
+    public GoalNoteDTO addNote(Long goalId, String email, String content) {
+        log.info("Adding note to goal: {} by user: {}", goalId, email);
+
+        com.mental.model.entity.UserGoal goal = getGoalAndValidateOwnership(goalId, email);
+
+        GoalNote note = GoalNote.builder()
+                .goal(goal)
+                .content(content)
+                .build();
+
+        note = noteRepository.save(note);
+        return goalMapper.toNoteDto(note);
+    }
+
+    @Override
+    @Transactional
+    public void deleteNote(Long noteId, String email) {
+        log.info("Deleting note: {} by user: {}", noteId, email);
+
+        GoalNote note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Note not found"));
+
+        // Validate ownership
+        if (!note.getGoal().getUser().getEmail().equals(email)) {
+            throw new SecurityException("Unauthorized to delete this note");
+        }
+
+        noteRepository.delete(note);
+        log.info("Note {} deleted successfully", noteId);
+    }
+
+    @Override
+    @Transactional
+    public GoalNoteDTO updateNote(Long noteId, String email, String content) {
+        log.info("Updating note: {} by user: {}", noteId, email);
+
+        GoalNote note = noteRepository.findById(noteId)
+                .orElseThrow(() -> new ResourceNotFoundException("Note not found"));
+
+        if (!note.getGoal().getUser().getEmail().equals(email)) {
+            throw new SecurityException("Unauthorized to update this note");
+        }
+
+        note.setContent(content);
+        note = noteRepository.save(note);
+        return goalMapper.toNoteDto(note);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GoalNoteDTO> getNotesByGoal(Long goalId, String email) {
+        log.debug("Fetching notes for goal: {} by user: {}", goalId, email);
+
+        // Validate ownership
+        getGoalAndValidateOwnership(goalId, email);
+
+        return noteRepository.findByGoalIdOrderByCreatedAtDesc(goalId)
+                .stream()
+                .map(goalMapper::toNoteDto)
+                .collect(Collectors.toList());
+    }
+
+    // ===== SCHEDULED JOB =====
     @Override
     @Transactional
     public void checkExpiredGoals() {
@@ -259,49 +474,7 @@ public class UserGoalServiceImpl implements UserGoalService {
         log.info("Expired goals check completed. Found: {}", count);
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public GoalStatistics getGoalStatistics(String email) {
-        log.debug("Fetching goal statistics for user: {}", email);
-
-        User user = getUserByEmail(email);
-
-        long total = goalRepository.countByUser(user);
-        long active = goalRepository.countByUserAndStatus(user, GoalStatus.ACTIVE);
-        long paused = goalRepository.countByUserAndStatus(user, GoalStatus.PAUSED);
-        long completed = goalRepository.countByUserAndStatus(user, GoalStatus.COMPLETED);
-        long expired = goalRepository.countByUserAndStatus(user, GoalStatus.EXPIRED);
-        long cancelled = goalRepository.countByUserAndStatus(user, GoalStatus.CANCELLED);
-
-        long totalProgress = calculateTotalProgress(user);
-
-        return GoalStatistics.builder()
-                .total(total)
-                .active(active)
-                .paused(paused)
-                .completed(completed)
-                .expired(expired)
-                .cancelled(cancelled)
-                .totalProgress(totalProgress)
-                .completionRate(total > 0 ? (completed * 100.0) / total : 0.0)
-                .build();
-    }
-
-    @Transactional(readOnly = true)
-    public List<UserGoal> getGoalsForDashboard(String email) {
-        log.debug("Fetching dashboard goals for user: {}", email);
-
-        User user = getUserByEmail(email);
-
-        return goalRepository.findByUserAndStatusOrderByCreatedAtDesc(user, GoalStatus.ACTIVE)
-                .stream()
-                .limit(5)
-                .map(goalMapper::toDto)
-                .toList();
-    }
-
-
-
+    // ===== PRIVATE HELPER METHODS =====
     private User getUserByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));

@@ -1,19 +1,14 @@
-// UserGoal.java
 package com.mental.dto.goal;
 
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
 @Builder
-@NoArgsConstructor
-@AllArgsConstructor
-public class UserGoal {
+public class GoalResponse {
     private Long id;
     private String title;
     private String description;
@@ -22,17 +17,15 @@ public class UserGoal {
     private String unit;
     private LocalDate startDate;
     private LocalDate targetDate;
+    private LocalDate completedAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime createdAt;
     private String icon;
     private Boolean silentMode;
     private Integer progress;
+    private Integer totalDays;
     private Integer streak;
     private String status;
-    private LocalDate completedAt;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
-
-    // UI Specific Fields
     private List<ProgressHistoryDTO> history;
     private List<GoalNoteDTO> notes;
 }
-

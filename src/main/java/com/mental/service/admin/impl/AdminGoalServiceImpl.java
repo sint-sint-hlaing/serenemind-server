@@ -1,6 +1,7 @@
 package com.mental.service.admin.impl;
 
 import com.mental.dto.admin.GoalStatisticDto;
+import com.mental.dto.goal.GoalResponse;
 import com.mental.dto.goal.UserGoal;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.mapper.UserGoalMapper;
@@ -25,12 +26,12 @@ public class AdminGoalServiceImpl implements AdminGoalService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<UserGoal> getGoals() {
+    public List<GoalResponse> getGoals() {
         log.info("Fetching all goals");
 
         return goalRepository.findAll()
                 .stream()
-                .map(goalMapper::toDto)
+                .map(goalMapper::toResponseDto)
                 .toList();
     }
 

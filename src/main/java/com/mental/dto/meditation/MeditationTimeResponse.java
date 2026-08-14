@@ -5,10 +5,9 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
-public class MeditationCategoryResponse {
-
+@NoArgsConstructor
+public class MeditationTimeResponse {
     private String name;
     private String displayName;
     private String emoji;
