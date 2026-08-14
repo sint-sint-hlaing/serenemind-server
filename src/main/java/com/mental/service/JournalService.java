@@ -2,7 +2,10 @@ package com.mental.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mental.dto.*;
+import com.mental.dto.JournalAnalysisResponse;
+import com.mental.dto.JournalPhotoResponse;
+import com.mental.dto.JournalRequest;
+import com.mental.dto.JournalResponse;
 import com.mental.exception.ResourceNotFoundException;
 import com.mental.model.entity.Journal;
 import com.mental.model.entity.JournalAnalysis;
@@ -13,23 +16,17 @@ import com.mental.repository.UserRepository;
 import com.mental.security.UserPrincipal;
 import com.mental.utils.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,24 +38,43 @@ public class JournalService {
     private final UserRepository userRepository;
     private final EncryptionUtil encryptionUtil;
     private final CloudinaryService cloudinaryService;
-    private final RestTemplate restTemplate;
+
+    private final ChatClient.Builder chatClientBuilder;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    @Value("${groq.api.key:}")
-    private String groqApiKey;
-
-    private static final Set<String> ALLOWED_MIME_TYPES =
-            Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
+    private static final int MAX_STRESS_SCORE = 100;
 
     private static final long MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024L;
 
+    private static final java.util.Set<String> ALLOWED_MIME_TYPES =
+            java.util.Set.of(
+                    "image/jpeg",
+                    "image/png",
+                    "image/webp",
+                    "image/gif"
+            );
+
+    /**
+     * Create a new journal.
+     */
     @Transactional
-    public JournalResponse createJournal(UserPrincipal userPrincipal, JournalRequest request) {
+    public JournalResponse createJournal(
+            UserPrincipal userPrincipal,
+            JournalRequest request
+    ) {
+
         User user = resolveUser(userPrincipal);
 
-        String encryptedContent = encryptionUtil.encrypt(request.getContent());
+        String content = request.getContent();
+
+        if (content == null || content.trim().isEmpty()) {
+            throw new IllegalArgumentException("Journal content must not be empty");
+        }
+
+        String encryptedContent = encryptionUtil.encrypt(content);
 
         Journal journal = new Journal();
+
         journal.setTitle(request.getTitle());
         journal.setEncryptedText(encryptedContent);
         journal.setUser(user);
@@ -66,21 +82,36 @@ public class JournalService {
         journal.setTags(tagsToString(request.getTags()));
 
         Journal saved = journalRepository.save(journal);
+
         return convertToResponse(saved);
     }
 
-
+    /**
+     * Get all journals belonging to current user.
+     */
     @Transactional(readOnly = true)
-    public List<JournalResponse> getAllMyJournals(UserPrincipal userPrincipal, String filter) {
+    public List<JournalResponse> getAllMyJournals(
+            UserPrincipal userPrincipal,
+            String filter
+    ) {
+
         User user = resolveUser(userPrincipal);
 
         List<Journal> journals;
+
         if ("favorites".equalsIgnoreCase(filter)) {
-            journals = journalRepository.findByUserAndFavouriteTrueOrderByCreatedAtDesc(user);
+
+            journals = journalRepository
+                    .findByUserAndFavouriteTrueOrderByCreatedAtDesc(user);
+
         } else if ("tagged".equalsIgnoreCase(filter)) {
+
             journals = journalRepository.findTaggedByUser(user);
+
         } else {
-            journals = journalRepository.findByUserOrderByCreatedAtDesc(user);
+
+            journals = journalRepository
+                    .findByUserOrderByCreatedAtDesc(user);
         }
 
         return journals.stream()
@@ -88,30 +119,71 @@ public class JournalService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Get all journals.
+     */
     @Transactional(readOnly = true)
-    public List<JournalResponse> getAllMyJournals(UserPrincipal userPrincipal) {
+    public List<JournalResponse> getAllMyJournals(
+            UserPrincipal userPrincipal
+    ) {
         return getAllMyJournals(userPrincipal, "all");
     }
 
-
+    /**
+     * Get journal by ID.
+     */
     @Transactional(readOnly = true)
-    public JournalResponse getJournalById(Long id, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(id, userPrincipal);
+    public JournalResponse getJournalById(
+            Long id,
+            UserPrincipal userPrincipal
+    ) {
+
+        Journal journal = findAndValidateOwnership(
+                id,
+                userPrincipal
+        );
+
         return convertToResponse(journal);
     }
 
-
+    /**
+     * Search journals.
+     */
     @Transactional(readOnly = true)
-    public List<JournalResponse> searchJournals(UserPrincipal userPrincipal, String query) {
+    public List<JournalResponse> searchJournals(
+            UserPrincipal userPrincipal,
+            String query
+    ) {
+
         User user = resolveUser(userPrincipal);
-        String trimmedQuery = query != null ? query.trim() : "";
+
+        String trimmedQuery =
+                query != null
+                        ? query.trim()
+                        : "";
 
         List<Journal> results;
+
         if (trimmedQuery.startsWith("#")) {
-            String tagQuery = trimmedQuery.substring(1).trim();
-            results = journalRepository.searchByUserAndTagOnly(user, tagQuery);
+
+            String tagQuery =
+                    trimmedQuery
+                            .substring(1)
+                            .trim();
+
+            results = journalRepository
+                    .searchByUserAndTagOnly(
+                            user,
+                            tagQuery
+                    );
+
         } else {
-            results = journalRepository.searchByUserAndTitleOrTag(user, trimmedQuery);
+
+            results = journalRepository
+                    .searchByUserAndTitleOrTag(
+                            user,
+                            trimmedQuery
+                    );
         }
 
         return results.stream()
@@ -119,335 +191,939 @@ public class JournalService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Update journal.
+     */
     @Transactional
-    public JournalResponse updateJournal(Long id, JournalRequest request, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(id, userPrincipal);
+    public JournalResponse updateJournal(
+            Long id,
+            JournalRequest request,
+            UserPrincipal userPrincipal
+    ) {
+
+        Journal journal =
+                findAndValidateOwnership(
+                        id,
+                        userPrincipal
+                );
+
+        String content = request.getContent();
+
+        if (content == null || content.trim().isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Journal content must not be empty"
+            );
+        }
 
         journal.setTitle(request.getTitle());
-        journal.setEncryptedText(encryptionUtil.encrypt(request.getContent()));
-        journal.setTags(tagsToString(request.getTags()));
-        journal.setFavourite(request.isFavourite());
 
-        return convertToResponse(journalRepository.save(journal));
+        journal.setEncryptedText(
+                encryptionUtil.encrypt(content)
+        );
+
+        journal.setTags(
+                tagsToString(request.getTags())
+        );
+
+        journal.setFavourite(
+                request.isFavourite()
+        );
+
+        /*
+         * If journal content changes, old AI analysis is no longer
+         * guaranteed to represent the journal.
+         *
+         * Delete the old analysis so the user can analyse the
+         * updated journal again.
+         */
+        JournalAnalysis existingAnalysis =
+                analysisRepository
+                        .findByJournal(journal)
+                        .orElse(null);
+
+        if (existingAnalysis != null) {
+            analysisRepository.delete(existingAnalysis);
+        }
+
+        Journal saved =
+                journalRepository.save(journal);
+
+        return convertToResponse(saved);
     }
 
-
+    /**
+     * Toggle favourite.
+     */
     @Transactional
-    public JournalResponse toggleFavourite(Long id, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(id, userPrincipal);
-        journal.setFavourite(!journal.isFavourite());
-        return convertToResponse(journalRepository.save(journal));
+    public JournalResponse toggleFavourite(
+            Long id,
+            UserPrincipal userPrincipal
+    ) {
+
+        Journal journal =
+                findAndValidateOwnership(
+                        id,
+                        userPrincipal
+                );
+
+        journal.setFavourite(
+                !journal.isFavourite()
+        );
+
+        return convertToResponse(
+                journalRepository.save(journal)
+        );
     }
 
-
+    /**
+     * Delete journal.
+     */
     @Transactional
-    public void deleteJournal(Long id, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(id, userPrincipal);
+    public void deleteJournal(
+            Long id,
+            UserPrincipal userPrincipal
+    ) {
+
+        Journal journal =
+                findAndValidateOwnership(
+                        id,
+                        userPrincipal
+                );
+
         journalRepository.delete(journal);
     }
 
-
+    /**
+     * Upload journal photo.
+     */
     @Transactional
-    public JournalPhotoResponse uploadPhoto(Long journalId,
-                                            MultipartFile file,
-                                            UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(journalId, userPrincipal);
+    public JournalPhotoResponse uploadPhoto(
+            Long journalId,
+            MultipartFile file,
+            UserPrincipal userPrincipal
+    ) {
+
+        Journal journal =
+                findAndValidateOwnership(
+                        journalId,
+                        userPrincipal
+                );
 
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("Photo file must not be empty");
-        }
-
-        String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType.toLowerCase())) {
             throw new IllegalArgumentException(
-                    "Unsupported file type. Allowed: JPEG, PNG, WebP, GIF");
+                    "Photo file must not be empty"
+            );
         }
 
+        String contentType =
+                file.getContentType();
+
+        if (
+                contentType == null
+                        || !ALLOWED_MIME_TYPES.contains(
+                        contentType.toLowerCase()
+                )
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Unsupported file type. Allowed: JPEG, PNG, WebP, GIF"
+            );
+        }
 
         if (file.getSize() > MAX_PHOTO_SIZE_BYTES) {
-            throw new IllegalArgumentException("Photo must not exceed 5 MB");
+            throw new IllegalArgumentException(
+                    "Photo must not exceed 5 MB"
+            );
         }
 
-        if (journal.getPhotoUrl() != null && !journal.getPhotoUrl().isBlank()) {
+        /*
+         * Delete previous Cloudinary image.
+         */
+        if (
+                journal.getPhotoUrl() != null
+                        && !journal.getPhotoUrl().isBlank()
+        ) {
+
             try {
-                cloudinaryService.deleteImage(journal.getPhotoUrl());
-            } catch (Exception e) {
-           }
-        }
 
-       String secureUrl = cloudinaryService.uploadImage(file);
-        if (secureUrl == null) {
-            throw new RuntimeException("Photo upload failed. Please try again.");
-        }
-
-        journal.setPhotoUrl(secureUrl);
-        journalRepository.save(journal);
-
-        JournalPhotoResponse response = new JournalPhotoResponse();
-        response.setJournalId(journalId);
-        response.setPhotoUrl(secureUrl);
-        response.setMessage("Photo uploaded successfully");
-        return response;
-    }
-
-
-    @Transactional
-    public JournalPhotoResponse deletePhoto(Long journalId, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(journalId, userPrincipal);
-
-        if (journal.getPhotoUrl() == null || journal.getPhotoUrl().isBlank()) {
-            throw new ResourceNotFoundException("No photo attached to this journal entry");
-        }
-
-        try {
-            cloudinaryService.deleteImage(journal.getPhotoUrl());
-        } catch (Exception e) {
-        }
-
-        journal.setPhotoUrl(null);
-        journalRepository.save(journal);
-
-        JournalPhotoResponse response = new JournalPhotoResponse();
-        response.setJournalId(journalId);
-        response.setPhotoUrl(null);
-        response.setMessage("Photo removed successfully");
-        return response;
-    }
-
-
-    @Transactional(readOnly = true)
-    public JournalAnalysisResponse getAnalysis(Long journalId, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(journalId, userPrincipal);
-
-        JournalAnalysis analysis = analysisRepository.findByJournal(journal)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Analysis not found. Trigger it first via the Analyse action."));
-
-        return convertAnalysisToResponse(analysis);
-    }
-
-    @Transactional
-    public JournalAnalysisResponse triggerAnalysis(Long journalId, UserPrincipal userPrincipal) {
-        Journal journal = findAndValidateOwnership(journalId, userPrincipal);
-
-        String plainText = encryptionUtil.decrypt(journal.getEncryptedText());
-
-
-        JournalAnalysis analysis = analysisRepository.findByJournal(journal)
-                .orElseGet(() -> {
-                    JournalAnalysis a = new JournalAnalysis();
-                    a.setJournal(journal);
-                    return a;
-                });
-
-        boolean success = false;
-
-
-        if (groqApiKey != null && !groqApiKey.isBlank()) {
-            try {
-                String url = "https://api.groq.com/openai/v1/chat/completions";
-
-                String prompt = "Analyze the following mental health journal entry.\n\n" +
-                        "Respond ONLY with a raw JSON object containing exactly these keys:\n" +
-                        "- emotion: One-word primary emotion (e.g. Calm, Happy, Anxious, Sad, Angry, Neutral)\n" +
-                        "- sentiment: POSITIVE, NEGATIVE, or NEUTRAL\n" +
-                        "- stressScore: A numeric stress level score from 0 to 100\n" +
-                        "- keyThemes: An array of 2 to 3 strings describing the core themes (e.g. [\"Work\", \"Stress\", \"Family\"])\n" +
-                        "- aiResponse: A supportive and empathetic reflection paragraph (2-3 sentences max)\n" +
-                        "- aiSuggestion: A helpful and actionable suggestion (1-2 sentences max)\n\n" +
-                        "Journal entry content:\n" + plainText;
-
-                Map<String, Object> systemMessage = Map.of(
-                        "role", "system",
-                        "content", "You are a compassionate mental health AI assistant. Always respond strictly with valid JSON only — no markdown, no extra text."
-                );
-                Map<String, Object> userMessage = Map.of("role", "user", "content", prompt);
-
-                Map<String, Object> requestBody = Map.of(
-                        "model", "llama-3.3-70b-versatile",
-                        "messages", List.of(systemMessage, userMessage),
-                        "response_format", Map.of("type", "json_object")
+                cloudinaryService.deleteImage(
+                        journal.getPhotoUrl()
                 );
 
-                HttpHeaders headers = new HttpHeaders();
-                headers.setContentType(MediaType.APPLICATION_JSON);
-                headers.setBearerAuth(groqApiKey);
-
-                HttpEntity<Map<String, Object>> requestEntity = new HttpEntity<>(requestBody, headers);
-                ResponseEntity<String> response = restTemplate.postForEntity(url, requestEntity, String.class);
-
-                if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-                    JsonNode root = objectMapper.readTree(response.getBody());
-                    String jsonText = root.path("choices").get(0).path("message").path("content").asText();
-
-                    JsonNode resultNode = objectMapper.readTree(jsonText);
-
-                    analysis.setEmotion(resultNode.path("emotion").asText("Neutral"));
-                    analysis.setSentiment(resultNode.path("sentiment").asText("NEUTRAL"));
-                    analysis.setStressScore(resultNode.path("stressScore").asInt(30));
-                    analysis.setStressLevel(toStressLevel(analysis.getStressScore()));
-
-                    List<String> themes = new java.util.ArrayList<>();
-                    resultNode.path("keyThemes").forEach(t -> themes.add(t.asText()));
-                    analysis.setKeyThemes(String.join(",", themes));
-
-                    analysis.setAiResponse(resultNode.path("aiResponse").asText("Your entry reflects a thoughtful processing of your thoughts. Keep journaling as a healthy habit."));
-                    analysis.setAiSuggestion(resultNode.path("aiSuggestion").asText("Consider doing a breathing exercise to rest your mind."));
-
-                    success = true;
-                }
-            } catch (Exception e) {
-                System.err.println("Error calling Groq API: " + e.getMessage());
+            } catch (Exception ignored) {
+                // Do not stop new upload because old image deletion failed.
             }
         }
 
-        if (!success) {
-            analysis.setEmotion(mockDetectEmotion(plainText));
-            analysis.setSentiment(mockDetectSentiment(plainText));
-            analysis.setStressScore(mockStressScore(plainText));
-            analysis.setStressLevel(toStressLevel(analysis.getStressScore()));
-            analysis.setKeyThemes(mockKeyThemes(plainText));
-            analysis.setAiResponse(mockAiResponse(plainText));
-            analysis.setAiSuggestion(mockAiSuggestion(analysis.getEmotion()));
+        String secureUrl =
+                cloudinaryService.uploadImage(file);
+
+        if (secureUrl == null || secureUrl.isBlank()) {
+            throw new RuntimeException(
+                    "Photo upload failed. Please try again."
+            );
         }
 
-        JournalAnalysis saved = analysisRepository.save(analysis);
-        return convertAnalysisToResponse(saved);
+        journal.setPhotoUrl(secureUrl);
+
+        journalRepository.save(journal);
+
+        JournalPhotoResponse response =
+                new JournalPhotoResponse();
+
+        response.setJournalId(journalId);
+        response.setPhotoUrl(secureUrl);
+        response.setMessage(
+                "Photo uploaded successfully"
+        );
+
+        return response;
     }
 
+    /**
+     * Delete journal photo.
+     */
+    @Transactional
+    public JournalPhotoResponse deletePhoto(
+            Long journalId,
+            UserPrincipal userPrincipal
+    ) {
 
-    private User resolveUser(UserPrincipal principal) {
-        return userRepository.findByEmail(principal.getEmail())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-    }
+        Journal journal =
+                findAndValidateOwnership(
+                        journalId,
+                        userPrincipal
+                );
 
-    private Journal findAndValidateOwnership(Long id, UserPrincipal principal) {
-        Journal journal = journalRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Journal not found"));
-        if (!journal.getUser().getEmail().equals(principal.getEmail())) {
-            throw new AccessDeniedException("Access denied");
+        if (
+                journal.getPhotoUrl() == null
+                        || journal.getPhotoUrl().isBlank()
+        ) {
+
+            throw new ResourceNotFoundException(
+                    "No photo attached to this journal entry"
+            );
         }
+
+        try {
+
+            cloudinaryService.deleteImage(
+                    journal.getPhotoUrl()
+            );
+
+        } catch (Exception ignored) {
+            // Continue removing URL from database.
+        }
+
+        journal.setPhotoUrl(null);
+
+        journalRepository.save(journal);
+
+        JournalPhotoResponse response =
+                new JournalPhotoResponse();
+
+        response.setJournalId(journalId);
+        response.setPhotoUrl(null);
+        response.setMessage(
+                "Photo removed successfully"
+        );
+
+        return response;
+    }
+
+    /**
+     * Get existing AI analysis.
+     */
+    @Transactional(readOnly = true)
+    public JournalAnalysisResponse getAnalysis(
+            Long journalId,
+            UserPrincipal userPrincipal
+    ) {
+
+        Journal journal =
+                findAndValidateOwnership(
+                        journalId,
+                        userPrincipal
+                );
+
+        JournalAnalysis analysis =
+                analysisRepository
+                        .findByJournal(journal)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException(
+                                        "Analysis not found. Trigger it first via the Analyse action."
+                                )
+                        );
+
+        return convertAnalysisToResponse(
+                analysis
+        );
+    }
+
+    /**
+     * Generate REAL AI analysis using Groq.
+     *
+     * There is intentionally NO mock/fallback analysis.
+     */
+    @Transactional
+    public JournalAnalysisResponse triggerAnalysis(
+            Long journalId,
+            UserPrincipal userPrincipal
+    ) {
+
+        Journal journal =
+                findAndValidateOwnership(
+                        journalId,
+                        userPrincipal
+                );
+
+        if (
+                journal.getEncryptedText() == null
+                        || journal.getEncryptedText().isBlank()
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Cannot analyse an empty journal."
+            );
+        }
+
+        String plainText;
+
+        try {
+
+            plainText =
+                    encryptionUtil.decrypt(
+                            journal.getEncryptedText()
+                    );
+
+        } catch (Exception e) {
+
+            throw new RuntimeException(
+                    "Unable to decrypt journal content for analysis.",
+                    e
+            );
+        }
+
+        if (
+                plainText == null
+                        || plainText.trim().isEmpty()
+        ) {
+
+            throw new IllegalArgumentException(
+                    "Cannot analyse an empty journal."
+            );
+        }
+
+        /*
+         * Build a new ChatClient.
+         *
+         * Spring AI automatically uses:
+         *
+         * spring.ai.openai.api-key
+         * spring.ai.openai.base-url
+         * spring.ai.openai.chat.model
+         * spring.ai.openai.chat.temperature
+         */
+        ChatClient chatClient =
+                chatClientBuilder.build();
+
+        String systemPrompt = """
+                You are a compassionate and careful mental wellness
+                journaling assistant.
+
+                Your task is to analyze ONE journal entry.
+
+                Important rules:
+
+                1. Analyze ONLY the journal entry provided by the user.
+                2. Do not diagnose mental illnesses.
+                3. Do not make medical diagnoses.
+                4. Do not invent facts that are not present in the journal.
+                5. The aiResponse must clearly reflect the actual content
+                   and emotions expressed in this specific journal.
+                6. The aiSuggestion must be specifically relevant to this
+                   journal entry.
+                7. Avoid generic repeated advice.
+                8. Be empathetic, supportive, practical, and concise.
+                9. If the journal contains positive experiences, acknowledge
+                   those specific experiences.
+                10. If the journal contains stress, sadness, anxiety,
+                    frustration, loneliness, or another difficult emotion,
+                    respond compassionately without exaggerating it.
+                11. If the journal is neutral, provide a neutral reflection.
+                12. Never claim certainty about the user's mental health.
+                13. Do not mention that you are an AI.
+                14. Return ONLY valid JSON.
+
+                JSON format:
+
+                {
+                  "emotion": "One primary emotion",
+                  "sentiment": "POSITIVE, NEGATIVE, or NEUTRAL",
+                  "stressScore": 0,
+                  "keyThemes": ["Theme 1", "Theme 2"],
+                  "aiResponse": "A personalized empathetic reflection in 2-3 sentences.",
+                  "aiSuggestion": "A personalized and actionable suggestion in 1-2 sentences."
+                }
+
+                stressScore rules:
+
+                0-33   = Low stress
+                34-66  = Medium stress
+                67-100 = High stress
+
+                The stress score must be an integer between 0 and 100.
+
+                keyThemes must contain 2 to 3 concise themes when enough
+                information is available. Do not invent themes.
+                """;
+
+        String userPrompt = """
+                Analyze the following journal entry.
+
+                Journal title:
+                %s
+
+                Journal content:
+                ---
+                %s
+                ---
+
+                Remember:
+                - Make aiResponse specific to THIS journal.
+                - Make aiSuggestion specific to THIS journal.
+                - Do not give generic filler.
+                - Return JSON only.
+                """.formatted(
+                journal.getTitle() != null
+                        ? journal.getTitle()
+                        : "Untitled",
+                plainText
+        );
+
+        try {
+
+            String aiContent =
+                    chatClient
+                            .prompt()
+                            .system(systemPrompt)
+                            .user(userPrompt)
+                            .call()
+                            .content();
+
+            if (
+                    aiContent == null
+                            || aiContent.isBlank()
+            ) {
+
+                throw new RuntimeException(
+                        "Groq returned an empty AI response."
+                );
+            }
+
+            /*
+             * Parse JSON returned by Groq.
+             */
+            JsonNode resultNode =
+                    objectMapper.readTree(
+                            aiContent.trim()
+                    );
+
+            if (
+                    resultNode == null
+                            || !resultNode.isObject()
+            ) {
+
+                throw new RuntimeException(
+                        "Groq returned an invalid analysis format."
+                );
+            }
+
+            /*
+             * Validate required AI fields.
+             */
+            validateAiResponse(resultNode);
+
+            /*
+             * Extract AI values.
+             */
+            String emotion =
+                    cleanValue(
+                            resultNode.path("emotion").asText()
+                    );
+
+            String sentiment =
+                    cleanValue(
+                            resultNode.path("sentiment").asText()
+                    );
+
+            int stressScore =
+                    resultNode
+                            .path("stressScore")
+                            .asInt(-1);
+
+            String aiResponse =
+                    cleanValue(
+                            resultNode
+                                    .path("aiResponse")
+                                    .asText()
+                    );
+
+            String aiSuggestion =
+                    cleanValue(
+                            resultNode
+                                    .path("aiSuggestion")
+                                    .asText()
+                    );
+
+            /*
+             * Validate stress score.
+             */
+            if (
+                    stressScore < 0
+                            || stressScore > MAX_STRESS_SCORE
+            ) {
+
+                throw new RuntimeException(
+                        "AI returned an invalid stress score."
+                );
+            }
+
+            /*
+             * Normalize sentiment.
+             */
+            sentiment =
+                    sentiment.toUpperCase();
+
+            if (
+                    !sentiment.equals("POSITIVE")
+                            && !sentiment.equals("NEGATIVE")
+                            && !sentiment.equals("NEUTRAL")
+            ) {
+
+                throw new RuntimeException(
+                        "AI returned an invalid sentiment."
+                );
+            }
+
+            /*
+             * Extract themes.
+             */
+            List<String> themes =
+                    extractThemes(
+                            resultNode.path("keyThemes")
+                    );
+
+            if (themes.isEmpty()) {
+
+                throw new RuntimeException(
+                        "AI returned no key themes."
+                );
+            }
+
+            /*
+             * Get existing analysis or create new one.
+             */
+            JournalAnalysis analysis =
+                    analysisRepository
+                            .findByJournal(journal)
+                            .orElseGet(() -> {
+
+                                JournalAnalysis newAnalysis =
+                                        new JournalAnalysis();
+
+                                newAnalysis.setJournal(
+                                        journal
+                                );
+
+                                return newAnalysis;
+                            });
+
+            /*
+             * Save REAL AI results.
+             */
+            analysis.setEmotion(emotion);
+            analysis.setSentiment(sentiment);
+            analysis.setStressScore(stressScore);
+            analysis.setStressLevel(
+                    toStressLevel(stressScore)
+            );
+            analysis.setKeyThemes(
+                    String.join(",", themes)
+            );
+            analysis.setAiResponse(
+                    aiResponse
+            );
+            analysis.setAiSuggestion(
+                    aiSuggestion
+            );
+
+            JournalAnalysis saved =
+                    analysisRepository.save(
+                            analysis
+                    );
+
+            return convertAnalysisToResponse(
+                    saved
+            );
+
+        } catch (Exception e) {
+
+            /*
+             * IMPORTANT:
+             *
+             * Do NOT generate fake/mock results.
+             *
+             * If Groq fails, tell the client the analysis failed.
+             */
+            System.err.println(
+                    "Real AI journal analysis failed: "
+                            + e.getMessage()
+            );
+
+            throw new RuntimeException(
+                    "AI analysis failed. Please try again later.",
+                    e
+            );
+        }
+    }
+
+    /**
+     * Validate AI JSON structure.
+     */
+    private void validateAiResponse(
+            JsonNode node
+    ) {
+
+        String[] requiredFields = {
+                "emotion",
+                "sentiment",
+                "stressScore",
+                "keyThemes",
+                "aiResponse",
+                "aiSuggestion"
+        };
+
+        for (String field : requiredFields) {
+
+            if (
+                    !node.has(field)
+                            || node.get(field).isNull()
+            ) {
+
+                throw new RuntimeException(
+                        "AI response is missing required field: "
+                                + field
+                );
+            }
+        }
+    }
+
+    /**
+     * Extract AI-generated themes.
+     */
+    private List<String> extractThemes(
+            JsonNode themesNode
+    ) {
+
+        if (
+                themesNode == null
+                        || !themesNode.isArray()
+        ) {
+            return Collections.emptyList();
+        }
+
+        List<String> themes =
+                new ArrayList<>();
+
+        themesNode.forEach(themeNode -> {
+
+            if (
+                    themeNode != null
+                            && themeNode.isTextual()
+            ) {
+
+                String theme =
+                        themeNode
+                                .asText()
+                                .trim();
+
+                if (!theme.isEmpty()) {
+                    themes.add(theme);
+                }
+            }
+        });
+
+        /*
+         * Remove duplicate themes while preserving order.
+         */
+        return themes.stream()
+                .distinct()
+                .limit(3)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Clean AI text.
+     */
+    private String cleanValue(
+            String value
+    ) {
+
+        if (value == null) {
+            return "";
+        }
+
+        return value.trim();
+    }
+
+    /**
+     * Resolve authenticated user.
+     */
+    private User resolveUser(
+            UserPrincipal principal
+    ) {
+
+        if (principal == null) {
+            throw new UsernameNotFoundException(
+                    "Authenticated user not found"
+            );
+        }
+
+        return userRepository
+                .findByEmail(principal.getEmail())
+                .orElseThrow(
+                        () -> new UsernameNotFoundException(
+                                "User not found"
+                        )
+                );
+    }
+
+    /**
+     * Find journal and verify ownership.
+     */
+    private Journal findAndValidateOwnership(
+            Long id,
+            UserPrincipal principal
+    ) {
+
+        Journal journal =
+                journalRepository
+                        .findById(id)
+                        .orElseThrow(
+                                () -> new ResourceNotFoundException(
+                                        "Journal not found"
+                                )
+                        );
+
+        if (
+                journal.getUser() == null
+                        || principal == null
+                        || !journal
+                        .getUser()
+                        .getEmail()
+                        .equals(principal.getEmail())
+        ) {
+
+            throw new AccessDeniedException(
+                    "Access denied"
+            );
+        }
+
         return journal;
     }
 
-    private JournalResponse convertToResponse(Journal journal) {
-        JournalResponse response = new JournalResponse();
-        response.setId(journal.getId());
-        response.setTitle(journal.getTitle());
+    /**
+     * Convert Journal entity to response DTO.
+     */
+    private JournalResponse convertToResponse(
+            Journal journal
+    ) {
 
-        if (journal.getEncryptedText() != null && !journal.getEncryptedText().isBlank()) {
-            String decrypted = encryptionUtil.decrypt(journal.getEncryptedText());
-            response.setContent(decrypted);
-            String plain = decrypted.trim();
-            response.setPreview(plain.length() > 120 ? plain.substring(0, 120) + "…" : plain);
+        JournalResponse response =
+                new JournalResponse();
+
+        response.setId(
+                journal.getId()
+        );
+
+        response.setTitle(
+                journal.getTitle()
+        );
+
+        if (
+                journal.getEncryptedText() != null
+                        && !journal
+                        .getEncryptedText()
+                        .isBlank()
+        ) {
+
+            String decrypted =
+                    encryptionUtil.decrypt(
+                            journal.getEncryptedText()
+                    );
+
+            response.setContent(
+                    decrypted
+            );
+
+            String plain =
+                    decrypted != null
+                            ? decrypted.trim()
+                            : "";
+
+            response.setPreview(
+                    plain.length() > 120
+                            ? plain.substring(0, 120) + "…"
+                            : plain
+            );
         }
 
-        response.setTags(stringToTags(journal.getTags()));
-        response.setFavourite(journal.isFavourite());
-        response.setPhotoUrl(journal.getPhotoUrl());
+        response.setTags(
+                stringToTags(
+                        journal.getTags()
+                )
+        );
+
+        response.setFavourite(
+                journal.isFavourite()
+        );
+
+        response.setPhotoUrl(
+                journal.getPhotoUrl()
+        );
+
         if (journal.getAnalysis() != null) {
-            response.setAnalysis(convertAnalysisToResponse(journal.getAnalysis()));
+
+            response.setAnalysis(
+                    convertAnalysisToResponse(
+                            journal.getAnalysis()
+                    )
+            );
         }
 
         return response;
     }
 
-    private JournalAnalysisResponse convertAnalysisToResponse(JournalAnalysis analysis) {
-        JournalAnalysisResponse r = new JournalAnalysisResponse();
-        r.setId(analysis.getId());
-        r.setEmotion(analysis.getEmotion());
-        r.setSentiment(analysis.getSentiment());
-        r.setStressScore(analysis.getStressScore());
-        r.setStressLevel(analysis.getStressLevel());
-        r.setKeyThemes(stringToTags(analysis.getKeyThemes()));
-        r.setAiResponse(analysis.getAiResponse());
-        r.setAiSuggestion(analysis.getAiSuggestion());
-        return r;
+    /**
+     * Convert JournalAnalysis entity to response.
+     */
+    private JournalAnalysisResponse convertAnalysisToResponse(
+            JournalAnalysis analysis
+    ) {
+
+        JournalAnalysisResponse response =
+                new JournalAnalysisResponse();
+
+        response.setId(
+                analysis.getId()
+        );
+
+        response.setEmotion(
+                analysis.getEmotion()
+        );
+
+        response.setSentiment(
+                analysis.getSentiment()
+        );
+
+        response.setStressScore(
+                analysis.getStressScore()
+        );
+
+        response.setStressLevel(
+                analysis.getStressLevel()
+        );
+
+        response.setKeyThemes(
+                stringToTags(
+                        analysis.getKeyThemes()
+                )
+        );
+
+        response.setAiResponse(
+                analysis.getAiResponse()
+        );
+
+        response.setAiSuggestion(
+                analysis.getAiSuggestion()
+        );
+
+        return response;
     }
 
+    /**
+     * Convert tags list to database string.
+     */
+    private String tagsToString(
+            List<String> tags
+    ) {
 
-    private String tagsToString(List<String> tags) {
-        if (tags == null || tags.isEmpty()) return null;
+        if (
+                tags == null
+                        || tags.isEmpty()
+        ) {
+            return null;
+        }
+
         return tags.stream()
                 .map(String::trim)
-                .map(tag -> tag.startsWith("#") ? tag.substring(1).trim() : tag)
-                .filter(tag -> !tag.isEmpty())
-                .collect(Collectors.joining(","));
+                .map(tag ->
+                        tag.startsWith("#")
+                                ? tag.substring(1).trim()
+                                : tag
+                )
+                .filter(
+                        tag -> !tag.isEmpty()
+                )
+                .distinct()
+                .collect(
+                        Collectors.joining(",")
+                );
     }
 
-    private List<String> stringToTags(String tags) {
-        if (tags == null || tags.isBlank()) return Collections.emptyList();
-        return Arrays.asList(tags.split(","));
+    /**
+     * Convert database tag string to list.
+     */
+    private List<String> stringToTags(
+            String tags
+    ) {
+
+        if (
+                tags == null
+                        || tags.isBlank()
+        ) {
+
+            return Collections.emptyList();
+        }
+
+        return Arrays.stream(
+                        tags.split(",")
+                )
+                .map(String::trim)
+                .filter(
+                        tag -> !tag.isEmpty()
+                )
+                .collect(
+                        Collectors.toList()
+                );
     }
 
-    private String toStressLevel(int score) {
-        if (score < 34) return "Low";
-        if (score < 67) return "Medium";
+    /**
+     * Convert numerical stress score to level.
+     */
+    private String toStressLevel(
+            int score
+    ) {
+
+        if (score < 34) {
+            return "Low";
+        }
+
+        if (score < 67) {
+            return "Medium";
+        }
+
         return "High";
     }
-
-
-    private String mockDetectEmotion(String text) {
-        String lower = text.toLowerCase();
-        if (lower.contains("happy") || lower.contains("great") || lower.contains("joy")) return "Happy";
-        if (lower.contains("calm") || lower.contains("peace") || lower.contains("relax")) return "Calm";
-        if (lower.contains("anxious") || lower.contains("worry") || lower.contains("stress")) return "Anxious";
-        if (lower.contains("sad") || lower.contains("cry") || lower.contains("miss")) return "Sad";
-        return "Neutral";
-    }
-
-    private String mockDetectSentiment(String text) {
-        String lower = text.toLowerCase();
-        long positiveCount = List.of("good", "great", "happy", "love", "wonderful", "amazing", "calm", "peace")
-                .stream().filter(lower::contains).count();
-        long negativeCount = List.of("bad", "sad", "angry", "hate", "stress", "anxious", "worry", "terrible")
-                .stream().filter(lower::contains).count();
-        if (positiveCount > negativeCount) return "POSITIVE";
-        if (negativeCount > positiveCount) return "NEGATIVE";
-        return "NEUTRAL";
-    }
-
-    private int mockStressScore(String text) {
-        String lower = text.toLowerCase();
-        int score = 30; // baseline
-        if (lower.contains("stress") || lower.contains("overwhelm")) score += 25;
-        if (lower.contains("anxious") || lower.contains("worry")) score += 20;
-        if (lower.contains("calm") || lower.contains("peace") || lower.contains("relax")) score -= 15;
-        if (lower.contains("happy") || lower.contains("good")) score -= 10;
-        return Math.max(0, Math.min(100, score));
-    }
-
-    private String mockKeyThemes(String text) {
-        String lower = text.toLowerCase();
-        List<String> themes = new java.util.ArrayList<>();
-        if (lower.contains("family") || lower.contains("parent") || lower.contains("child")) themes.add("Family");
-        if (lower.contains("grateful") || lower.contains("gratitude") || lower.contains("thankful")) themes.add("Gratitude");
-        if (lower.contains("work") || lower.contains("task") || lower.contains("goal")) themes.add("Productivity");
-        if (lower.contains("health") || lower.contains("exercise") || lower.contains("walk")) themes.add("Health");
-        if (lower.contains("positive") || lower.contains("hope") || lower.contains("better")) themes.add("Positivity");
-        if (themes.isEmpty()) themes.add("Reflection");
-        return String.join(",", themes);
-    }
-
-    private String mockAiResponse(String text) {
-        return "Your journal entry reflects a thoughtful and self-aware mindset. " +
-               "The emotions you've expressed suggest you are actively processing your daily experiences, " +
-               "which is a healthy and productive practice. Keep acknowledging both the challenges and " +
-               "the positive moments in your life.";
-    }
-
-    private String mockAiSuggestion(String emotion) {
-        return switch (emotion) {
-            case "Anxious" -> "You seem a bit stressed. Try to keep this positive momentum going. " +
-                              "Consider a short meditation tonight to improve your sleep.";
-            case "Sad"     -> "It's okay to feel this way. Reach out to someone you trust today " +
-                              "and try a short breathing exercise to lift your mood.";
-            case "Happy"   -> "Great day! Consider channelling this energy into a goal you've been " +
-                              "putting off. Momentum is your friend right now.";
-            default        -> "You're in a good space! Try to keep this positive momentum going. " +
-                              "Consider a short meditation tonight to improve your sleep.";
-        };
-    }
-
-
 }
