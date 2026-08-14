@@ -17,16 +17,17 @@ import com.mental.security.UserPrincipal;
 import com.mental.utils.EncryptionUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -40,23 +41,26 @@ public class JournalService {
     private final CloudinaryService cloudinaryService;
 
     private final ChatClient.Builder chatClientBuilder;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final int MAX_STRESS_SCORE = 100;
 
-    private static final long MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024L;
+    private static final long MAX_PHOTO_SIZE_BYTES =
+            5 * 1024 * 1024L;
 
-    private static final java.util.Set<String> ALLOWED_MIME_TYPES =
-            java.util.Set.of(
+    private static final Set<String> ALLOWED_MIME_TYPES =
+            Set.of(
                     "image/jpeg",
                     "image/png",
                     "image/webp",
                     "image/gif"
             );
 
-    /**
-     * Create a new journal.
-     */
+    // ============================================================
+    // CREATE JOURNAL
+    // ============================================================
+
     @Transactional
     public JournalResponse createJournal(
             UserPrincipal userPrincipal,
@@ -68,10 +72,13 @@ public class JournalService {
         String content = request.getContent();
 
         if (content == null || content.trim().isEmpty()) {
-            throw new IllegalArgumentException("Journal content must not be empty");
+            throw new IllegalArgumentException(
+                    "Journal content must not be empty"
+            );
         }
 
-        String encryptedContent = encryptionUtil.encrypt(content);
+        String encryptedContent =
+                encryptionUtil.encrypt(content);
 
         Journal journal = new Journal();
 
@@ -81,14 +88,16 @@ public class JournalService {
         journal.setFavourite(request.isFavourite());
         journal.setTags(tagsToString(request.getTags()));
 
-        Journal saved = journalRepository.save(journal);
+        Journal saved =
+                journalRepository.save(journal);
 
         return convertToResponse(saved);
     }
 
-    /**
-     * Get all journals belonging to current user.
-     */
+    // ============================================================
+    // GET ALL JOURNALS
+    // ============================================================
+
     @Transactional(readOnly = true)
     public List<JournalResponse> getAllMyJournals(
             UserPrincipal userPrincipal,
@@ -101,17 +110,22 @@ public class JournalService {
 
         if ("favorites".equalsIgnoreCase(filter)) {
 
-            journals = journalRepository
-                    .findByUserAndFavouriteTrueOrderByCreatedAtDesc(user);
+            journals =
+                    journalRepository
+                            .findByUserAndFavouriteTrueOrderByCreatedAtDesc(
+                                    user
+                            );
 
         } else if ("tagged".equalsIgnoreCase(filter)) {
 
-            journals = journalRepository.findTaggedByUser(user);
+            journals =
+                    journalRepository.findTaggedByUser(user);
 
         } else {
 
-            journals = journalRepository
-                    .findByUserOrderByCreatedAtDesc(user);
+            journals =
+                    journalRepository
+                            .findByUserOrderByCreatedAtDesc(user);
         }
 
         return journals.stream()
@@ -119,36 +133,40 @@ public class JournalService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Get all journals.
-     */
     @Transactional(readOnly = true)
     public List<JournalResponse> getAllMyJournals(
             UserPrincipal userPrincipal
     ) {
-        return getAllMyJournals(userPrincipal, "all");
+
+        return getAllMyJournals(
+                userPrincipal,
+                "all"
+        );
     }
 
-    /**
-     * Get journal by ID.
-     */
+    // ============================================================
+    // GET JOURNAL BY ID
+    // ============================================================
+
     @Transactional(readOnly = true)
     public JournalResponse getJournalById(
             Long id,
             UserPrincipal userPrincipal
     ) {
 
-        Journal journal = findAndValidateOwnership(
-                id,
-                userPrincipal
-        );
+        Journal journal =
+                findAndValidateOwnership(
+                        id,
+                        userPrincipal
+                );
 
         return convertToResponse(journal);
     }
 
-    /**
-     * Search journals.
-     */
+    // ============================================================
+    // SEARCH JOURNALS
+    // ============================================================
+
     @Transactional(readOnly = true)
     public List<JournalResponse> searchJournals(
             UserPrincipal userPrincipal,
@@ -171,19 +189,21 @@ public class JournalService {
                             .substring(1)
                             .trim();
 
-            results = journalRepository
-                    .searchByUserAndTagOnly(
-                            user,
-                            tagQuery
-                    );
+            results =
+                    journalRepository
+                            .searchByUserAndTagOnly(
+                                    user,
+                                    tagQuery
+                            );
 
         } else {
 
-            results = journalRepository
-                    .searchByUserAndTitleOrTag(
-                            user,
-                            trimmedQuery
-                    );
+            results =
+                    journalRepository
+                            .searchByUserAndTitleOrTag(
+                                    user,
+                                    trimmedQuery
+                            );
         }
 
         return results.stream()
@@ -191,9 +211,10 @@ public class JournalService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Update journal.
-     */
+    // ============================================================
+    // UPDATE JOURNAL
+    // ============================================================
+
     @Transactional
     public JournalResponse updateJournal(
             Long id,
@@ -207,15 +228,22 @@ public class JournalService {
                         userPrincipal
                 );
 
-        String content = request.getContent();
+        String content =
+                request.getContent();
 
-        if (content == null || content.trim().isEmpty()) {
+        if (
+                content == null
+                        || content.trim().isEmpty()
+        ) {
+
             throw new IllegalArgumentException(
                     "Journal content must not be empty"
             );
         }
 
-        journal.setTitle(request.getTitle());
+        journal.setTitle(
+                request.getTitle()
+        );
 
         journal.setEncryptedText(
                 encryptionUtil.encrypt(content)
@@ -230,11 +258,8 @@ public class JournalService {
         );
 
         /*
-         * If journal content changes, old AI analysis is no longer
-         * guaranteed to represent the journal.
-         *
-         * Delete the old analysis so the user can analyse the
-         * updated journal again.
+         * Existing AI analysis is no longer reliable after
+         * journal content changes.
          */
         JournalAnalysis existingAnalysis =
                 analysisRepository
@@ -242,7 +267,10 @@ public class JournalService {
                         .orElse(null);
 
         if (existingAnalysis != null) {
-            analysisRepository.delete(existingAnalysis);
+
+            analysisRepository.delete(
+                    existingAnalysis
+            );
         }
 
         Journal saved =
@@ -251,9 +279,10 @@ public class JournalService {
         return convertToResponse(saved);
     }
 
-    /**
-     * Toggle favourite.
-     */
+    // ============================================================
+    // TOGGLE FAVOURITE
+    // ============================================================
+
     @Transactional
     public JournalResponse toggleFavourite(
             Long id,
@@ -275,9 +304,10 @@ public class JournalService {
         );
     }
 
-    /**
-     * Delete journal.
-     */
+    // ============================================================
+    // DELETE JOURNAL
+    // ============================================================
+
     @Transactional
     public void deleteJournal(
             Long id,
@@ -293,9 +323,10 @@ public class JournalService {
         journalRepository.delete(journal);
     }
 
-    /**
-     * Upload journal photo.
-     */
+    // ============================================================
+    // UPLOAD PHOTO
+    // ============================================================
+
     @Transactional
     public JournalPhotoResponse uploadPhoto(
             Long journalId,
@@ -310,6 +341,7 @@ public class JournalService {
                 );
 
         if (file == null || file.isEmpty()) {
+
             throw new IllegalArgumentException(
                     "Photo file must not be empty"
             );
@@ -330,18 +362,24 @@ public class JournalService {
             );
         }
 
-        if (file.getSize() > MAX_PHOTO_SIZE_BYTES) {
+        if (
+                file.getSize()
+                        > MAX_PHOTO_SIZE_BYTES
+        ) {
+
             throw new IllegalArgumentException(
                     "Photo must not exceed 5 MB"
             );
         }
 
         /*
-         * Delete previous Cloudinary image.
+         * Delete old photo.
          */
         if (
                 journal.getPhotoUrl() != null
-                        && !journal.getPhotoUrl().isBlank()
+                        && !journal
+                        .getPhotoUrl()
+                        .isBlank()
         ) {
 
             try {
@@ -351,28 +389,40 @@ public class JournalService {
                 );
 
             } catch (Exception ignored) {
-                // Do not stop new upload because old image deletion failed.
+                // Continue with new upload.
             }
         }
 
         String secureUrl =
                 cloudinaryService.uploadImage(file);
 
-        if (secureUrl == null || secureUrl.isBlank()) {
+        if (
+                secureUrl == null
+                        || secureUrl.isBlank()
+        ) {
+
             throw new RuntimeException(
                     "Photo upload failed. Please try again."
             );
         }
 
-        journal.setPhotoUrl(secureUrl);
+        journal.setPhotoUrl(
+                secureUrl
+        );
 
         journalRepository.save(journal);
 
         JournalPhotoResponse response =
                 new JournalPhotoResponse();
 
-        response.setJournalId(journalId);
-        response.setPhotoUrl(secureUrl);
+        response.setJournalId(
+                journalId
+        );
+
+        response.setPhotoUrl(
+                secureUrl
+        );
+
         response.setMessage(
                 "Photo uploaded successfully"
         );
@@ -380,9 +430,10 @@ public class JournalService {
         return response;
     }
 
-    /**
-     * Delete journal photo.
-     */
+    // ============================================================
+    // DELETE PHOTO
+    // ============================================================
+
     @Transactional
     public JournalPhotoResponse deletePhoto(
             Long journalId,
@@ -397,7 +448,9 @@ public class JournalService {
 
         if (
                 journal.getPhotoUrl() == null
-                        || journal.getPhotoUrl().isBlank()
+                        || journal
+                        .getPhotoUrl()
+                        .isBlank()
         ) {
 
             throw new ResourceNotFoundException(
@@ -412,7 +465,7 @@ public class JournalService {
             );
 
         } catch (Exception ignored) {
-            // Continue removing URL from database.
+            // Continue removing database URL.
         }
 
         journal.setPhotoUrl(null);
@@ -422,8 +475,12 @@ public class JournalService {
         JournalPhotoResponse response =
                 new JournalPhotoResponse();
 
-        response.setJournalId(journalId);
+        response.setJournalId(
+                journalId
+        );
+
         response.setPhotoUrl(null);
+
         response.setMessage(
                 "Photo removed successfully"
         );
@@ -431,9 +488,10 @@ public class JournalService {
         return response;
     }
 
-    /**
-     * Get existing AI analysis.
-     */
+    // ============================================================
+    // GET EXISTING AI ANALYSIS
+    // ============================================================
+
     @Transactional(readOnly = true)
     public JournalAnalysisResponse getAnalysis(
             Long journalId,
@@ -450,9 +508,10 @@ public class JournalService {
                 analysisRepository
                         .findByJournal(journal)
                         .orElseThrow(
-                                () -> new ResourceNotFoundException(
-                                        "Analysis not found. Trigger it first via the Analyse action."
-                                )
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Analysis not found. Trigger it first via the Analyse action."
+                                        )
                         );
 
         return convertAnalysisToResponse(
@@ -460,11 +519,10 @@ public class JournalService {
         );
     }
 
-    /**
-     * Generate REAL AI analysis using Groq.
-     *
-     * There is intentionally NO mock/fallback analysis.
-     */
+    // ============================================================
+    // REAL AI ANALYSIS
+    // ============================================================
+
     @Transactional
     public JournalAnalysisResponse triggerAnalysis(
             Long journalId,
@@ -477,9 +535,15 @@ public class JournalService {
                         userPrincipal
                 );
 
+        // --------------------------------------------------------
+        // Validate journal content
+        // --------------------------------------------------------
+
         if (
                 journal.getEncryptedText() == null
-                        || journal.getEncryptedText().isBlank()
+                        || journal
+                        .getEncryptedText()
+                        .isBlank()
         ) {
 
             throw new IllegalArgumentException(
@@ -514,92 +578,249 @@ public class JournalService {
             );
         }
 
-        /*
-         * Build a new ChatClient.
-         *
-         * Spring AI automatically uses:
-         *
-         * spring.ai.openai.api-key
-         * spring.ai.openai.base-url
-         * spring.ai.openai.chat.model
-         * spring.ai.openai.chat.temperature
-         */
+        // --------------------------------------------------------
+        // Build ChatClient
+        // --------------------------------------------------------
+
         ChatClient chatClient =
                 chatClientBuilder.build();
 
+        // --------------------------------------------------------
+        // SYSTEM PROMPT
+        //
+        // IMPORTANT:
+        // Journal can be Burmese.
+        // AI ANALYSIS MUST ALWAYS BE ENGLISH.
+        // --------------------------------------------------------
+
         String systemPrompt = """
                 You are a compassionate and careful mental wellness
-                journaling assistant.
+                journaling analysis assistant.
 
-                Your task is to analyze ONE journal entry.
+                You analyze one private journal entry at a time.
 
-                Important rules:
+                LANGUAGE REQUIREMENT:
+                
+                The journal may be written in:
+                - Burmese / Myanmar language
+                - English
+                - Burmese + English
+                - Burmese written using English characters
+                - Informal Burmese
+                - Mixed conversational language
 
-                1. Analyze ONLY the journal entry provided by the user.
-                2. Do not diagnose mental illnesses.
-                3. Do not make medical diagnoses.
-                4. Do not invent facts that are not present in the journal.
-                5. The aiResponse must clearly reflect the actual content
-                   and emotions expressed in this specific journal.
-                6. The aiSuggestion must be specifically relevant to this
-                   journal entry.
-                7. Avoid generic repeated advice.
-                8. Be empathetic, supportive, practical, and concise.
-                9. If the journal contains positive experiences, acknowledge
-                   those specific experiences.
-                10. If the journal contains stress, sadness, anxiety,
-                    frustration, loneliness, or another difficult emotion,
-                    respond compassionately without exaggerating it.
-                11. If the journal is neutral, provide a neutral reflection.
-                12. Never claim certainty about the user's mental health.
-                13. Do not mention that you are an AI.
-                14. Return ONLY valid JSON.
+                You MUST understand the journal's meaning regardless
+                of its input language.
 
-                JSON format:
+                HOWEVER, YOUR ENTIRE ANALYSIS OUTPUT MUST ALWAYS BE
+                IN ENGLISH.
 
+                This means:
+
+                - emotion MUST be in English.
+                - sentiment MUST be in English.
+                - keyThemes MUST be in English.
+                - aiResponse MUST be in English.
+                - aiSuggestion MUST be in English.
+
+                NEVER return Burmese text in the JSON response,
+                even when the journal is completely written in Burmese.
+
+                Example:
+
+                Burmese journal:
+                "ဒီနေ့ အလုပ်မှာ အရမ်းပင်ပန်းပြီး စိတ်ဖိစီးနေတယ်။"
+
+                Correct English analysis:
                 {
-                  "emotion": "One primary emotion",
-                  "sentiment": "POSITIVE, NEGATIVE, or NEUTRAL",
-                  "stressScore": 0,
-                  "keyThemes": ["Theme 1", "Theme 2"],
-                  "aiResponse": "A personalized empathetic reflection in 2-3 sentences.",
-                  "aiSuggestion": "A personalized and actionable suggestion in 1-2 sentences."
+                  "emotion": "Stressed",
+                  "sentiment": "NEGATIVE",
+                  "stressScore": 72,
+                  "keyThemes": ["Work", "Fatigue", "Stress"],
+                  "aiResponse": "Your entry suggests that work left you feeling very tired and emotionally stressed today. It sounds like the pressure from work had a noticeable effect on your mood.",
+                  "aiSuggestion": "Consider giving yourself a short period of rest after work and choose one relaxing activity tonight before thinking about tomorrow's tasks."
                 }
 
-                stressScore rules:
+                ANALYSIS RULES:
 
-                0-33   = Low stress
-                34-66  = Medium stress
-                67-100 = High stress
+                1. Analyze ONLY the journal provided.
 
-                The stress score must be an integer between 0 and 100.
+                2. Do not diagnose mental illnesses.
 
-                keyThemes must contain 2 to 3 concise themes when enough
-                information is available. Do not invent themes.
+                3. Do not provide medical diagnoses.
+
+                4. Do not invent facts.
+
+                5. Do not assume information that is not present.
+
+                6. Understand Burmese emotional expressions correctly.
+
+                7. Understand Burmese-English mixed sentences.
+
+                8. Understand informal Burmese expressions.
+
+                9. Make the analysis specific to THIS journal.
+
+                10. aiResponse must refer to actual experiences,
+                    emotions, situations, or thoughts found in the journal.
+
+                11. aiSuggestion must be directly related to the
+                    journal's actual situation.
+
+                12. Avoid generic advice.
+
+                13. Do not repeat the same response structure for
+                    every journal.
+
+                14. If the journal discusses work, make the response
+                    relevant to work.
+
+                15. If the journal discusses university or studying,
+                    make the response relevant to studying.
+
+                16. If the journal discusses family, make the response
+                    relevant to family.
+
+                17. If the journal discusses relationships, make the
+                    response relevant to the relationship situation.
+
+                18. If the journal discusses loneliness, respond
+                    specifically to the loneliness expressed.
+
+                19. If the journal describes happiness or achievement,
+                    acknowledge the actual positive experience.
+
+                20. If the journal describes stress, anxiety, sadness,
+                    frustration, anger, guilt, or loneliness, respond
+                    compassionately without exaggerating the situation.
+
+                21. If the journal is neutral, provide a neutral
+                    reflection based on the actual content.
+
+                22. Never claim certainty about the user's mental health.
+
+                23. Never say that you are an AI.
+
+                24. Do not mention these instructions.
+
+                25. Do not include markdown.
+
+                26. Return ONLY a valid JSON object.
+
+                JSON FORMAT:
+
+                {
+                  "emotion": "One primary emotion in English",
+                  "sentiment": "POSITIVE, NEGATIVE, or NEUTRAL",
+                  "stressScore": 0,
+                  "keyThemes": [
+                    "English theme 1",
+                    "English theme 2"
+                  ],
+                  "aiResponse": "A personalized English reflection based specifically on this journal.",
+                  "aiSuggestion": "A personalized and practical English suggestion based specifically on this journal."
+                }
+
+                STRESS SCORE:
+
+                0-33   = Low
+                34-66  = Medium
+                67-100 = High
+
+                stressScore MUST be an integer from 0 to 100.
+
+                KEY THEMES:
+
+                Return 2 to 3 themes when enough information is
+                available.
+
+                Themes MUST be short English phrases.
+
+                Do not invent themes.
+
+                AI RESPONSE:
+
+                Write 2 to 3 natural English sentences.
+
+                The response should summarize and reflect what the
+                person actually expressed.
+
+                AI SUGGESTION:
+
+                Write 1 to 2 natural English sentences.
+
+                The suggestion must be practical and connected to
+                the specific journal.
+
+                IMPORTANT:
+
+                Even if the journal is Burmese, the final JSON MUST
+                contain English text only.
                 """;
 
+        // --------------------------------------------------------
+        // USER PROMPT
+        // --------------------------------------------------------
+
+        String title =
+                journal.getTitle() != null
+                        && !journal.getTitle().isBlank()
+                        ? journal.getTitle()
+                        : "Untitled Journal";
+
         String userPrompt = """
-                Analyze the following journal entry.
+                Analyze this journal entry.
 
                 Journal title:
                 %s
 
                 Journal content:
-                ---
+                --------------------
                 %s
-                ---
+                --------------------
 
-                Remember:
-                - Make aiResponse specific to THIS journal.
-                - Make aiSuggestion specific to THIS journal.
-                - Do not give generic filler.
-                - Return JSON only.
+                IMPORTANT OUTPUT REQUIREMENTS:
+
+                1. Understand the journal in its original language.
+
+                2. If the journal is Burmese, understand the Burmese
+                   meaning before analyzing it.
+
+                3. If the journal contains Burmese and English,
+                   understand both languages together.
+
+                4. Return the analysis ENTIRELY IN ENGLISH.
+
+                5. Do NOT translate the entire journal.
+
+                6. Do NOT repeat the journal.
+
+                7. Make aiResponse specific to this journal.
+
+                8. Make aiSuggestion specific to this journal.
+
+                9. Avoid generic mental wellness statements.
+
+                10. Return ONLY valid JSON.
+
+                Required JSON:
+
+                {
+                  "emotion": "English emotion",
+                  "sentiment": "POSITIVE, NEGATIVE, or NEUTRAL",
+                  "stressScore": 0,
+                  "keyThemes": ["English theme 1", "English theme 2"],
+                  "aiResponse": "Personalized English reflection.",
+                  "aiSuggestion": "Personalized English suggestion."
+                }
                 """.formatted(
-                journal.getTitle() != null
-                        ? journal.getTitle()
-                        : "Untitled",
+                title,
                 plainText
         );
+
+        // --------------------------------------------------------
+        // CALL GROQ
+        // --------------------------------------------------------
 
         try {
 
@@ -621,13 +842,63 @@ public class JournalService {
                 );
             }
 
-            /*
-             * Parse JSON returned by Groq.
-             */
-            JsonNode resultNode =
-                    objectMapper.readTree(
-                            aiContent.trim()
-                    );
+            System.out.println(
+                    "========== GROQ RAW RESPONSE =========="
+            );
+
+            System.out.println(aiContent);
+
+            System.out.println(
+                    "========================================"
+            );
+
+            // ----------------------------------------------------
+            // Clean markdown fences
+            //
+            // Handles:
+            //
+            // ```json
+            // {...}
+            // ```
+            //
+            // and:
+            //
+            // ```
+            // {...}
+            // ```
+            // ----------------------------------------------------
+
+            String cleanedJson =
+                    cleanJsonResponse(aiContent);
+
+            // ----------------------------------------------------
+            // Parse JSON
+            // ----------------------------------------------------
+
+            JsonNode resultNode;
+
+            try {
+
+                resultNode =
+                        objectMapper.readTree(
+                                cleanedJson
+                        );
+
+            } catch (Exception jsonException) {
+
+                System.err.println(
+                        "Invalid JSON returned by Groq:"
+                );
+
+                System.err.println(
+                        cleanedJson
+                );
+
+                throw new RuntimeException(
+                        "Groq returned invalid JSON.",
+                        jsonException
+                );
+            }
 
             if (
                     resultNode == null
@@ -635,65 +906,47 @@ public class JournalService {
             ) {
 
                 throw new RuntimeException(
-                        "Groq returned an invalid analysis format."
+                        "Groq returned an invalid analysis object."
                 );
             }
 
-            /*
-             * Validate required AI fields.
-             */
-            validateAiResponse(resultNode);
+            // ----------------------------------------------------
+            // Validate required fields
+            // ----------------------------------------------------
 
-            /*
-             * Extract AI values.
-             */
+            validateAiResponse(
+                    resultNode
+            );
+
+            // ----------------------------------------------------
+            // Extract emotion
+            // ----------------------------------------------------
+
             String emotion =
                     cleanValue(
-                            resultNode.path("emotion").asText()
+                            resultNode
+                                    .path("emotion")
+                                    .asText()
                     );
+
+            if (emotion.isBlank()) {
+
+                throw new RuntimeException(
+                        "AI returned an empty emotion."
+                );
+            }
+
+            // ----------------------------------------------------
+            // Extract sentiment
+            // ----------------------------------------------------
 
             String sentiment =
                     cleanValue(
-                            resultNode.path("sentiment").asText()
-                    );
-
-            int stressScore =
-                    resultNode
-                            .path("stressScore")
-                            .asInt(-1);
-
-            String aiResponse =
-                    cleanValue(
                             resultNode
-                                    .path("aiResponse")
+                                    .path("sentiment")
                                     .asText()
-                    );
-
-            String aiSuggestion =
-                    cleanValue(
-                            resultNode
-                                    .path("aiSuggestion")
-                                    .asText()
-                    );
-
-            /*
-             * Validate stress score.
-             */
-            if (
-                    stressScore < 0
-                            || stressScore > MAX_STRESS_SCORE
-            ) {
-
-                throw new RuntimeException(
-                        "AI returned an invalid stress score."
-                );
-            }
-
-            /*
-             * Normalize sentiment.
-             */
-            sentiment =
-                    sentiment.toUpperCase();
+                    )
+                            .toUpperCase();
 
             if (
                     !sentiment.equals("POSITIVE")
@@ -702,13 +955,46 @@ public class JournalService {
             ) {
 
                 throw new RuntimeException(
-                        "AI returned an invalid sentiment."
+                        "AI returned invalid sentiment: "
+                                + sentiment
                 );
             }
 
-            /*
-             * Extract themes.
-             */
+            // ----------------------------------------------------
+            // Extract stress score
+            // ----------------------------------------------------
+
+            JsonNode stressNode =
+                    resultNode.path("stressScore");
+
+            if (
+                    !stressNode.isNumber()
+                            || stressNode.isFloatingPointNumber()
+            ) {
+
+                throw new RuntimeException(
+                        "AI returned an invalid stressScore."
+                );
+            }
+
+            int stressScore =
+                    stressNode.asInt();
+
+            if (
+                    stressScore < 0
+                            || stressScore > MAX_STRESS_SCORE
+            ) {
+
+                throw new RuntimeException(
+                        "AI returned invalid stressScore: "
+                                + stressScore
+                );
+            }
+
+            // ----------------------------------------------------
+            // Extract themes
+            // ----------------------------------------------------
+
             List<String> themes =
                     extractThemes(
                             resultNode.path("keyThemes")
@@ -721,9 +1007,46 @@ public class JournalService {
                 );
             }
 
-            /*
-             * Get existing analysis or create new one.
-             */
+            // ----------------------------------------------------
+            // Extract AI response
+            // ----------------------------------------------------
+
+            String aiResponse =
+                    cleanValue(
+                            resultNode
+                                    .path("aiResponse")
+                                    .asText()
+                    );
+
+            if (aiResponse.isBlank()) {
+
+                throw new RuntimeException(
+                        "AI returned an empty aiResponse."
+                );
+            }
+
+            // ----------------------------------------------------
+            // Extract AI suggestion
+            // ----------------------------------------------------
+
+            String aiSuggestion =
+                    cleanValue(
+                            resultNode
+                                    .path("aiSuggestion")
+                                    .asText()
+                    );
+
+            if (aiSuggestion.isBlank()) {
+
+                throw new RuntimeException(
+                        "AI returned an empty aiSuggestion."
+                );
+            }
+
+            // ----------------------------------------------------
+            // Get existing analysis
+            // ----------------------------------------------------
+
             JournalAnalysis analysis =
                     analysisRepository
                             .findByJournal(journal)
@@ -739,21 +1062,39 @@ public class JournalService {
                                 return newAnalysis;
                             });
 
-            /*
-             * Save REAL AI results.
-             */
-            analysis.setEmotion(emotion);
-            analysis.setSentiment(sentiment);
-            analysis.setStressScore(stressScore);
+            // ----------------------------------------------------
+            // SAVE REAL AI DATA
+            // ----------------------------------------------------
+
+            analysis.setEmotion(
+                    emotion
+            );
+
+            analysis.setSentiment(
+                    sentiment
+            );
+
+            analysis.setStressScore(
+                    stressScore
+            );
+
             analysis.setStressLevel(
-                    toStressLevel(stressScore)
+                    toStressLevel(
+                            stressScore
+                    )
             );
+
             analysis.setKeyThemes(
-                    String.join(",", themes)
+                    String.join(
+                            ",",
+                            themes
+                    )
             );
+
             analysis.setAiResponse(
                     aiResponse
             );
+
             analysis.setAiSuggestion(
                     aiSuggestion
             );
@@ -767,17 +1108,37 @@ public class JournalService {
                     saved
             );
 
+        } catch (RuntimeException e) {
+
+            System.err.println(
+                    "========================================"
+            );
+
+            System.err.println(
+                    "REAL AI JOURNAL ANALYSIS FAILED"
+            );
+
+            System.err.println(
+                    "Journal ID: " + journalId
+            );
+
+            System.err.println(
+                    "Error: " + e.getMessage()
+            );
+
+            System.err.println(
+                    "========================================"
+            );
+
+            throw new RuntimeException(
+                    "AI analysis failed. Please try again later.",
+                    e
+            );
+
         } catch (Exception e) {
 
-            /*
-             * IMPORTANT:
-             *
-             * Do NOT generate fake/mock results.
-             *
-             * If Groq fails, tell the client the analysis failed.
-             */
             System.err.println(
-                    "Real AI journal analysis failed: "
+                    "Unexpected AI analysis error: "
                             + e.getMessage()
             );
 
@@ -788,9 +1149,86 @@ public class JournalService {
         }
     }
 
-    /**
-     * Validate AI JSON structure.
-     */
+    // ============================================================
+    // CLEAN GROQ JSON
+    // ============================================================
+
+    private String cleanJsonResponse(
+            String response
+    ) {
+
+        if (response == null) {
+            return "";
+        }
+
+        String cleaned =
+                response.trim();
+
+        /*
+         * Remove ```json ... ```
+         */
+        if (cleaned.startsWith("```")) {
+
+            int firstNewLine =
+                    cleaned.indexOf('\n');
+
+            if (firstNewLine >= 0) {
+
+                cleaned =
+                        cleaned.substring(
+                                firstNewLine + 1
+                        );
+            }
+
+            int lastFence =
+                    cleaned.lastIndexOf("```");
+
+            if (lastFence >= 0) {
+
+                cleaned =
+                        cleaned.substring(
+                                0,
+                                lastFence
+                        );
+            }
+        }
+
+        cleaned =
+                cleaned.trim();
+
+        /*
+         * Sometimes models return:
+         *
+         * Here is the JSON:
+         * {...}
+         *
+         * Find the first object and last object.
+         */
+        int firstBrace =
+                cleaned.indexOf('{');
+
+        int lastBrace =
+                cleaned.lastIndexOf('}');
+
+        if (
+                firstBrace >= 0
+                        && lastBrace > firstBrace
+        ) {
+
+            cleaned =
+                    cleaned.substring(
+                            firstBrace,
+                            lastBrace + 1
+                    );
+        }
+
+        return cleaned.trim();
+    }
+
+    // ============================================================
+    // VALIDATE AI JSON
+    // ============================================================
+
     private void validateAiResponse(
             JsonNode node
     ) {
@@ -817,11 +1255,47 @@ public class JournalService {
                 );
             }
         }
+
+        if (!node.get("emotion").isTextual()) {
+
+            throw new RuntimeException(
+                    "AI field 'emotion' must be a string."
+            );
+        }
+
+        if (!node.get("sentiment").isTextual()) {
+
+            throw new RuntimeException(
+                    "AI field 'sentiment' must be a string."
+            );
+        }
+
+        if (!node.get("keyThemes").isArray()) {
+
+            throw new RuntimeException(
+                    "AI field 'keyThemes' must be an array."
+            );
+        }
+
+        if (!node.get("aiResponse").isTextual()) {
+
+            throw new RuntimeException(
+                    "AI field 'aiResponse' must be a string."
+            );
+        }
+
+        if (!node.get("aiSuggestion").isTextual()) {
+
+            throw new RuntimeException(
+                    "AI field 'aiSuggestion' must be a string."
+            );
+        }
     }
 
-    /**
-     * Extract AI-generated themes.
-     */
+    // ============================================================
+    // EXTRACT THEMES
+    // ============================================================
+
     private List<String> extractThemes(
             JsonNode themesNode
     ) {
@@ -830,42 +1304,46 @@ public class JournalService {
                 themesNode == null
                         || !themesNode.isArray()
         ) {
+
             return Collections.emptyList();
         }
 
         List<String> themes =
                 new ArrayList<>();
 
-        themesNode.forEach(themeNode -> {
+        themesNode.forEach(
+                themeNode -> {
 
-            if (
-                    themeNode != null
-                            && themeNode.isTextual()
-            ) {
+                    if (
+                            themeNode != null
+                                    && themeNode.isTextual()
+                    ) {
 
-                String theme =
-                        themeNode
-                                .asText()
-                                .trim();
+                        String theme =
+                                themeNode
+                                        .asText()
+                                        .trim();
 
-                if (!theme.isEmpty()) {
-                    themes.add(theme);
+                        if (!theme.isEmpty()) {
+
+                            themes.add(theme);
+                        }
+                    }
                 }
-            }
-        });
+        );
 
-        /*
-         * Remove duplicate themes while preserving order.
-         */
         return themes.stream()
                 .distinct()
                 .limit(3)
-                .collect(Collectors.toList());
+                .collect(
+                        Collectors.toList()
+                );
     }
 
-    /**
-     * Clean AI text.
-     */
+    // ============================================================
+    // CLEAN TEXT
+    // ============================================================
+
     private String cleanValue(
             String value
     ) {
@@ -877,31 +1355,37 @@ public class JournalService {
         return value.trim();
     }
 
-    /**
-     * Resolve authenticated user.
-     */
+    // ============================================================
+    // RESOLVE USER
+    // ============================================================
+
     private User resolveUser(
             UserPrincipal principal
     ) {
 
         if (principal == null) {
+
             throw new UsernameNotFoundException(
                     "Authenticated user not found"
             );
         }
 
         return userRepository
-                .findByEmail(principal.getEmail())
+                .findByEmail(
+                        principal.getEmail()
+                )
                 .orElseThrow(
-                        () -> new UsernameNotFoundException(
-                                "User not found"
-                        )
+                        () ->
+                                new UsernameNotFoundException(
+                                        "User not found"
+                                )
                 );
     }
 
-    /**
-     * Find journal and verify ownership.
-     */
+    // ============================================================
+    // OWNERSHIP CHECK
+    // ============================================================
+
     private Journal findAndValidateOwnership(
             Long id,
             UserPrincipal principal
@@ -911,9 +1395,10 @@ public class JournalService {
                 journalRepository
                         .findById(id)
                         .orElseThrow(
-                                () -> new ResourceNotFoundException(
-                                        "Journal not found"
-                                )
+                                () ->
+                                        new ResourceNotFoundException(
+                                                "Journal not found"
+                                        )
                         );
 
         if (
@@ -922,7 +1407,9 @@ public class JournalService {
                         || !journal
                         .getUser()
                         .getEmail()
-                        .equals(principal.getEmail())
+                        .equals(
+                                principal.getEmail()
+                        )
         ) {
 
             throw new AccessDeniedException(
@@ -933,9 +1420,10 @@ public class JournalService {
         return journal;
     }
 
-    /**
-     * Convert Journal entity to response DTO.
-     */
+    // ============================================================
+    // JOURNAL RESPONSE
+    // ============================================================
+
     private JournalResponse convertToResponse(
             Journal journal
     ) {
@@ -974,7 +1462,10 @@ public class JournalService {
 
             response.setPreview(
                     plain.length() > 120
-                            ? plain.substring(0, 120) + "…"
+                            ? plain.substring(
+                            0,
+                            120
+                    ) + "…"
                             : plain
             );
         }
@@ -1005,9 +1496,10 @@ public class JournalService {
         return response;
     }
 
-    /**
-     * Convert JournalAnalysis entity to response.
-     */
+    // ============================================================
+    // ANALYSIS RESPONSE
+    // ============================================================
+
     private JournalAnalysisResponse convertAnalysisToResponse(
             JournalAnalysis analysis
     ) {
@@ -1052,9 +1544,10 @@ public class JournalService {
         return response;
     }
 
-    /**
-     * Convert tags list to database string.
-     */
+    // ============================================================
+    // TAGS -> STRING
+    // ============================================================
+
     private String tagsToString(
             List<String> tags
     ) {
@@ -1063,18 +1556,23 @@ public class JournalService {
                 tags == null
                         || tags.isEmpty()
         ) {
+
             return null;
         }
 
         return tags.stream()
                 .map(String::trim)
-                .map(tag ->
-                        tag.startsWith("#")
-                                ? tag.substring(1).trim()
-                                : tag
+                .map(
+                        tag ->
+                                tag.startsWith("#")
+                                        ? tag
+                                        .substring(1)
+                                        .trim()
+                                        : tag
                 )
                 .filter(
-                        tag -> !tag.isEmpty()
+                        tag ->
+                                !tag.isEmpty()
                 )
                 .distinct()
                 .collect(
@@ -1082,9 +1580,10 @@ public class JournalService {
                 );
     }
 
-    /**
-     * Convert database tag string to list.
-     */
+    // ============================================================
+    // STRING -> TAGS
+    // ============================================================
+
     private List<String> stringToTags(
             String tags
     ) {
@@ -1102,16 +1601,18 @@ public class JournalService {
                 )
                 .map(String::trim)
                 .filter(
-                        tag -> !tag.isEmpty()
+                        tag ->
+                                !tag.isEmpty()
                 )
                 .collect(
                         Collectors.toList()
                 );
     }
 
-    /**
-     * Convert numerical stress score to level.
-     */
+    // ============================================================
+    // STRESS LEVEL
+    // ============================================================
+
     private String toStressLevel(
             int score
     ) {
