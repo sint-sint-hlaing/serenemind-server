@@ -43,51 +43,57 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
     @Override
     @Transactional
     public void saveMood(String email, MoodRequest request) {
-        log.info("Saving mood for user: {}", email);
+        log.info("Saving or updating mood for user: {}", email);
 
         User user = findUserByEmail(email);
         LocalDate today = LocalDate.now();
 
-        // Check if mood already saved for today
-       /** boolean alreadySaved = moodTrackingRepository.existsByUserIdAndDate(
-                user.getId(),
-                today
-        );
-
-        if (alreadySaved) {
-            throw new IllegalStateException("You have already saved a mood for today.");
-        }*/
-
         // Calculate score based on mood percentage and intensity
         int score = calculateMoodScore(request.mood(), request.intensity());
 
-        // Create entity with calculated score
-        MoodEntry entry = moodMapper.toEntity(request, user);
-        entry.setDate(today);
-        entry.setScore(score); // Set calculated score
+        // Check if a mood entry already exists for today
+        Optional<MoodEntry> existingEntryOpt = moodTrackingRepository
+                .findFirstByUserEmailAndDateOrderByCreatedAtDesc(email, today);
+
+        MoodEntry entry;
+        if (existingEntryOpt.isPresent()) {
+            // Update existing record
+            entry = existingEntryOpt.get();
+            entry.setMood(request.mood());
+            entry.setIntensity(request.intensity());
+            entry.setScore(score);
+            entry.setNote(request.note());
+            log.info("Updating existing mood entry (ID: {}) for user: {} on date: {}", entry.getId(), email, today);
+        } else {
+            // Create new record
+            entry = moodMapper.toEntity(request, user);
+            entry.setDate(today);
+            entry.setScore(score);
+            log.info("Creating new mood entry for user: {} on date: {}", email, today);
+        }
 
         moodTrackingRepository.save(entry);
 
-        log.info("Mood saved successfully for user: {} with score: {}", email, score);
+        log.info("Mood processed successfully for user: {} with score: {}", email, score);
     }
 
 
     private int calculateMoodScore(MoodType mood, int intensity) {
-        // Validate intensity
-        if (intensity < 1 || intensity > 100) {
-            log.warn("Invalid intensity: {}, defaulting to 5", intensity);
-            intensity = Math.min(10, Math.max(1, intensity)); // Clamp to valid range
+        // ✅ Intensity ကို 1 မှ 10 အတွင်း မှန်ကန်စွာ Clamp လုပ်ခြင်း
+        if (intensity < 1 || intensity > 10) {
+            log.warn("Invalid intensity: {}, clamping to valid range 1-10", intensity);
+            intensity = Math.min(10, Math.max(1, intensity));
         }
-        // Get base percentage from enum
+
+        // Get base percentage from enum (HAPPY=90, SAD=40, etc.)
         int baseScore = mood.getPercentage();
 
-        // Intensity adjustment: -20% to +20%
-        // Intensity 1 = -20%, 5 = 0%, 10 = +20%
-        double intensityAdjustment = (intensity - 5) * 4.0; // Range: -20 to +20
+        // Intensity adjustment: Intensity 1 = -16%, 5 = 0%, 10 = +20%
+        double intensityAdjustment = (intensity - 5) * 4.0; // Range: -16 to +20
 
         double finalScore = baseScore + intensityAdjustment;
 
-        // Clamp between 0 and 100
+        // Clamp score between 0 and 100
         return (int) Math.max(0, Math.min(100, Math.round(finalScore)));
     }
 

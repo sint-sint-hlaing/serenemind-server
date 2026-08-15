@@ -27,7 +27,7 @@ public class MoodEntry extends BaseEntity {
     private MoodType mood;
 
     @Column(nullable = false)
-    private int intensity;
+    private Integer intensity;
 
     @Column(nullable = false)
     private Integer score = 0;
