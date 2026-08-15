@@ -8,6 +8,7 @@ import com.mental.model.entity.MoodEntry;
 import com.mental.model.entity.User;
 import com.mental.model.entity.enums.MoodType;
 import com.mental.repository.MoodTrackingRepository;
+import com.mental.repository.NotificationRepository;
 import com.mental.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +30,7 @@ public class DashboardService {
 
     private final MoodTrackingRepository moodTrackingRepository;
     private final UserRepository userRepository;
-
+    private final NotificationRepository notificationRepository; // Injected NotificationRepository
 
     public DashboardResponse getDashboardData(String email) {
         log.debug("Fetching dashboard data for user: {}", email);
@@ -38,12 +39,14 @@ public class DashboardService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
 
         LocalDate today = LocalDate.now();
+        boolean hasUnread = notificationRepository.countByUserIdAndIsReadFalse(user.getId()) > 0;
 
         return DashboardResponse.builder()
-                .greeting(buildGreeting(user.getUsername())) // getUsername() အစား getName() ကို သုံးပါ
+                .greeting(buildGreeting(user.getUsername()))
                 .formattedDate(today.format(DateTimeFormatter.ofPattern("MMM dd, yyyy")))
                 .todayMood(getTodayMood(email, today))
                 .weeklyOverview(getWeeklyOverview(email, today))
+                .unreadNotification(hasUnread) // Set boolean flag
                 .build();
     }
 
@@ -84,10 +87,8 @@ public class DashboardService {
             MoodEntry entry = latestEntryPerDay.get(day);
             boolean hasData = entry != null;
 
-            // ✅ Integer (Object Wrapper) ဖြင့် ကြေညာပါ
             Integer score = 0;
             if (hasData) {
-                // entry.getScore() သည် null ဖြစ်နိုင်သဖြင့် Integer Object ဖြင့် စစ်ပါသည်
                 Integer existingScore = entry.getScore();
 
                 if (existingScore != null && existingScore > 0) {
@@ -110,7 +111,6 @@ public class DashboardService {
         return weeklyList;
     }
 
-    // Helper Method
     private int calculateFallbackScore(MoodType mood, int intensity) {
         int baseScore = switch (mood) {
             case HAPPY -> 90;
@@ -128,7 +128,7 @@ public class DashboardService {
     private String buildGreeting(String userName) {
         int hour = LocalTime.now().getHour();
         String timeOfDay = (hour < 12) ? "Good morning" : (hour < 17) ? "Good afternoon" : "Good evening";
-        return String.format("%s", timeOfDay, userName != null ? userName : "User");
+        return String.format("%s, %s", timeOfDay, userName != null ? userName : "User");
     }
 
     private String getEncouragingMessage(MoodType mood) {

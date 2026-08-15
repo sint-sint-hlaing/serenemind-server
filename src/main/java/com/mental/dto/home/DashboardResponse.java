@@ -10,5 +10,6 @@ public record DashboardResponse(
         String greeting,          // e.g., "Good morning, Aye!"
         String formattedDate,     // e.g., "May 12, 2024"
         TodayMoodDto todayMood,
-        List<WeeklyDayDto> weeklyOverview
+        List<WeeklyDayDto> weeklyOverview,
+        boolean unreadNotification
 ) {}
