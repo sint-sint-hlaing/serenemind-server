@@ -3,7 +3,6 @@ package com.mental.service;
 import com.mental.dto.home.*;
 import com.mental.dto.mood.WeeklyMoodResponse;
 import com.mental.exception.ResourceNotFoundException;
-import com.mental.mapper.DashboardMapper;
 import com.mental.model.entity.MoodEntry;
 import com.mental.model.entity.User;
 import com.mental.model.entity.enums.MoodType;
@@ -14,7 +13,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.time.*;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,7 +27,6 @@ public class DashboardService {
 
     private final UserRepository userRepository;
     private final MoodTrackingRepository moodRepository;
-    private final DashboardMapper dashboardMapper;
     private final NotificationRepository notificationRepository;
 
     public DashboardResponse getDashboardData(String email) {
@@ -43,51 +44,46 @@ public class DashboardService {
                 .todayMood(getTodayMood(user))
                 .weeklyOverview(getWeeklyMood(user))
                 .quickActions(getQuickActions())
-                .currentStreak(user.getCurrentStreak())
-                .isNewBest(user.getCurrentStreak() >= user.getLongestStreak())
                 .unreadNotificationCount(unreadCount)
                 .build();
     }
 
     private TodayMoodResponse getTodayMood(User user) {
-        MoodEntry latest = moodRepository
-                .findTopByUserOrderByCreatedAtDesc(user)
+        return moodRepository
+                .findTopByUserAndDateOrderByCreatedAtDesc(user, LocalDate.now())
+                .map(latest -> TodayMoodResponse.builder()
+                        .mood(latest.getMood())
+                        .percentage(latest.getMood().getPercentage())
+                        .message(latest.getMood().getMessage())
+                        .build())
                 .orElse(null);
-
-        if (latest == null) {
-            return TodayMoodResponse.builder()
-                    .mood(MoodType.NEUTRAL)
-                    .percentage(MoodType.NEUTRAL.getPercentage())
-                    .message(MoodType.NEUTRAL.getMessage())
-                    .build();
-        }
-
-        return TodayMoodResponse.builder()
-                .mood(latest.getMood())
-                .percentage(latest.getMood().getPercentage())
-                .message(latest.getMood().getMessage())
-                .build();
     }
 
     private List<WeeklyMoodResponse> getWeeklyMood(User user) {
         List<WeeklyMoodResponse> result = new ArrayList<>();
         LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 
         for (DayOfWeek day : DayOfWeek.values()) {
-            LocalDate date = today.with(day);
+            LocalDate date = monday.plusDays(day.getValue() - 1);
 
             if (date.isAfter(today)) {
+                result.add(WeeklyMoodResponse.builder()
+                        .day(day)
+                        .percentage(0)
+                        .mood(null)
+                        .build());
                 continue;
             }
 
-            int percentage = moodRepository
+            MoodEntry moodEntry = moodRepository
                     .findTopByUserAndDateOrderByCreatedAtDesc(user, date)
-                    .map(mood -> mood.getMood().getPercentage())
-                    .orElse(0);
+                    .orElse(null);
 
             result.add(WeeklyMoodResponse.builder()
                     .day(day)
-                    .percentage(percentage)
+                    .percentage(moodEntry != null ? moodEntry.getMood().getPercentage() : 0)
+                    .mood(moodEntry != null ? moodEntry.getMood() : MoodType.NEUTRAL)
                     .build());
         }
 
@@ -104,11 +100,10 @@ public class DashboardService {
 
     private List<QuickActionResponse> getQuickActions() {
         return List.of(
-                new QuickActionResponse("Journal", "📒", "journal"),
-                new QuickActionResponse("Meditation", "🧘", "meditation"),
-                new QuickActionResponse("Goals", "🎯", "goal"),
-                new QuickActionResponse("Breathing", "🌬️", "sereneAI")
+                new QuickActionResponse("Journal", "journal"),
+                new QuickActionResponse("Meditate", "meditation"),
+                new QuickActionResponse("Goals", "goal"),
+                new QuickActionResponse("SereneAI", "sereneAI")
         );
     }
 }
-

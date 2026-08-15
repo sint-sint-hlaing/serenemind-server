@@ -174,4 +174,10 @@ public interface MoodTrackingRepository extends JpaRepository<MoodEntry, Long> {
     );
 
     boolean existsByUserIdAndDate(Long id, LocalDate today);
+
+//    Optional<MoodEntry> findTopByUserAndDateOrderByCreatedAtDesc(User user, LocalDate date);
+
+    // Add this method for batch querying weekly mood data
+//    List<MoodEntry> findByUserAndDateBetweenOrderByCreatedAtDesc(User user, LocalDate startDate, LocalDate endDate);
+
 }
