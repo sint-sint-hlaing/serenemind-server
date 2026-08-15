@@ -21,10 +21,10 @@ public class GoalResponse {
     private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
     private String icon;
+    private String color;
     private Boolean silentMode;
     private Integer progress;
     private Integer totalDays;
-    private Integer streak;
     private String status;
     private List<ProgressHistoryDTO> history;
     private List<GoalNoteDTO> notes;

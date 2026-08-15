@@ -1,18 +1,17 @@
 package com.mental.dto.goal;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.mental.model.entity.enums.Frequency;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.LocalDate;
 
-@Data
+@Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -32,6 +31,7 @@ public class GoalRequest {
         private String unit;
         private LocalDate startDate;
         private String icon;
+        private String color;
         private Boolean silentMode;
         private Long userId;
 }

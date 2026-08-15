@@ -11,7 +11,9 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Getter @Setter
 @Builder
@@ -41,30 +43,30 @@ public class UserGoal {
     @Column(name = "target_days", nullable = false)
     private int targetDays;
 
+
     @Column(nullable = false)
-    private int progress = 0;
+    private Integer progress = 0;
+    private String color;
 
     @Column(name = "unit")
     private String unit;
 
     @Column(name = "icon")
     private String icon = "📚";
-
     @Column(name = "start_date")
     private LocalDate startDate;
 
     @Column(name = "silent_mode")
     private Boolean silentMode = false;
 
-    @Column(name = "streak")
-    private int streak = 0;
+    @ElementCollection
+    private Set<LocalDate> checkedDates = new HashSet<>();
 
 
     @Column(name = "target_date")
     private LocalDate targetDate;
-
-
-
+    @Column(columnDefinition = "TEXT")
+    private String note;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

@@ -50,15 +50,13 @@ public interface UserGoalRepository extends JpaRepository<UserGoal, Long> {
     @Query("SELECT g FROM UserGoal g WHERE g.user.id = :userId AND g.status = 'ACTIVE'")
     List<UserGoal> findActiveGoalsByUser(@Param("userId") Long userId);
 
-    @Query("SELECT SUM(g.streak) FROM UserGoal g WHERE g.user.id = :userId AND g.status = 'ACTIVE'")
-    Integer getTotalStreakByUser(@Param("userId") Long userId);
+
 
 
     @Query("SELECT g FROM UserGoal g WHERE g.user = :user AND g.status IN :statuses ORDER BY g.createdAt DESC")
     List<UserGoal> findByUserAndStatusInOrderByCreatedAtDesc(@Param("user") User user, @Param("statuses") List<GoalStatus> statuses);
 
-    @Query("SELECT SUM(g.streak) FROM UserGoal g WHERE g.user = :user AND g.status = 'ACTIVE'")
-    Integer getTotalStreakByUser(@Param("user") User user);
+
 
     @Query("SELECT g FROM UserGoal g WHERE g.user = :user AND g.status = 'ACTIVE' ORDER BY g.createdAt DESC LIMIT 5")
     List<UserGoal> findTop5ActiveByUser(@Param("user") User user);

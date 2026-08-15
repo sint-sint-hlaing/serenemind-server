@@ -3,6 +3,8 @@ package com.mental.service;
 
 import com.mental.dto.goal.*;
 import com.mental.model.entity.enums.GoalStatus;
+import jakarta.validation.Valid;
+
 import java.util.List;
 
 public interface UserGoalService {
@@ -40,4 +42,8 @@ public interface UserGoalService {
     void deleteNote(Long noteId, String email);
     GoalNoteDTO updateNote(Long noteId, String email, String content);
     List<GoalNoteDTO> getNotesByGoal(Long goalId, String email);
+
+    GoalResponse getGoalById(Long id, String email);
+
+    GoalResponse updateGoal(Long id, String email, @Valid GoalRequest request);
 }

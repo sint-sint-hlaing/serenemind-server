@@ -47,22 +47,33 @@ public class UserGoalServiceImpl implements UserGoalService {
         validateGoalRequest(request);
         User user = getUserByEmail(email);
 
-        LocalDate startDate = request.getStartDate() != null ? request.getStartDate() : LocalDate.now();
-        LocalDate targetDate = startDate.plusDays(request.getTargetDays());
+        LocalDate startDate = request.getStartDate() != null
+                ? request.getStartDate()
+                : LocalDate.now();
 
+        LocalDate targetDate = startDate.plusDays(request.getTargetDays());
         com.mental.model.entity.UserGoal entity = com.mental.model.entity.UserGoal.builder()
                 .user(user)
                 .title(request.getTitle().trim())
-                .description(request.getDescription() != null ? request.getDescription().trim() : null)
-                .frequency(request.getFrequency() != null ? request.getFrequency() : Frequency.DAILY)
+                .description(request.getDescription() != null
+                        ? request.getDescription().trim()
+                        : null)
+                .frequency(request.getFrequency() != null
+                        ? request.getFrequency()
+                        : Frequency.DAILY)
                 .targetDays(request.getTargetDays())
-                .unit(request.getUnit() != null ? request.getUnit() : "days")
+                .unit(request.getUnit() != null
+                        ? request.getUnit()
+                        : "days")
                 .startDate(startDate)
                 .targetDate(targetDate)
-                .icon(request.getIcon() != null ? request.getIcon() : "📚")
-                .silentMode(request.getSilentMode() != null ? request.getSilentMode() : false)
+                .icon(request.getIcon() != null
+                        ? request.getIcon()
+                        : "📚")
+                .silentMode(request.getSilentMode() != null
+                        ? request.getSilentMode()
+                        : false)
                 .progress(0)
-                .streak(0)
                 .status(GoalStatus.ACTIVE)
                 .build();
 
@@ -75,22 +86,35 @@ public class UserGoalServiceImpl implements UserGoalService {
         return goalMapper.toResponseDto(saved);
     }
 
+
     private void initializeProgress(com.mental.model.entity.UserGoal goal) {
-        LocalDate startDate = goal.getStartDate() != null ? goal.getStartDate() : LocalDate.now();
-        LocalDate currentDate = LocalDate.now();
+
+        LocalDate startDate = goal.getStartDate() != null
+                ? goal.getStartDate()
+                : LocalDate.now();
+
+        LocalDate targetDate = goal.getTargetDate() != null
+                ? goal.getTargetDate()
+                : startDate.plusDays(goal.getTargetDays());
 
         List<GoalProgress> progressList = new ArrayList<>();
+
         LocalDate date = startDate;
-        while (!date.isAfter(currentDate)) {
+
+        while (date.isBefore(targetDate)) {
+
             GoalProgress progress = GoalProgress.builder()
                     .goal(goal)
                     .date(date)
                     .completed(false)
                     .value(0.0)
                     .build();
+
             progressList.add(progress);
+
             date = date.plusDays(1);
         }
+
         progressRepository.saveAll(progressList);
     }
 
@@ -111,8 +135,6 @@ public class UserGoalServiceImpl implements UserGoalService {
         // Increment progress
         incrementProgress(entity);
 
-        // Update streak
-        updateStreak(entity.getUser());
 
         // Update today's progress
         updateTodayProgress(entity);
@@ -123,7 +145,6 @@ public class UserGoalServiceImpl implements UserGoalService {
         }
 
         // Update streak count in goal
-        entity.setStreak(calculateStreak(entity.getId()));
 
         com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
         log.info("Progress updated for goal: {}, new progress: {}/{}",
@@ -361,8 +382,7 @@ public class UserGoalServiceImpl implements UserGoalService {
         long cancelled = goalRepository.countByUserAndStatus(user, GoalStatus.CANCELLED);
 
         long totalProgress = calculateTotalProgress(user);
-        int totalStreak = goalRepository.getTotalStreakByUser(user) != null ?
-                goalRepository.getTotalStreakByUser(user) : 0;
+
 
         return GoalStatistics.builder()
                 .total(total)
@@ -373,20 +393,9 @@ public class UserGoalServiceImpl implements UserGoalService {
                 .cancelled(cancelled)
                 .totalProgress(totalProgress)
                 .completionRate(total > 0 ? (completed * 100.0) / total : 0.0)
-                .totalStreak(totalStreak)
-                .currentStreak(getCurrentStreak(user))
                 .build();
     }
 
-    private int getCurrentStreak(User user) {
-        List<com.mental.model.entity.UserGoal> activeGoals =
-                goalRepository.findByUserAndStatus(user, GoalStatus.ACTIVE);
-
-        return activeGoals.stream()
-                .mapToInt(com.mental.model.entity.UserGoal::getStreak)
-                .max()
-                .orElse(0);
-    }
 
     // ===== NOTE MANAGEMENT =====
     @Override
@@ -452,6 +461,74 @@ public class UserGoalServiceImpl implements UserGoalService {
                 .map(goalMapper::toNoteDto)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GoalResponse getGoalById(Long id, String email) {
+        log.debug("Fetching goal: {} for user: {}", id, email);
+
+        User user = getUserByEmail(email);
+
+        com.mental.model.entity.UserGoal goal = goalRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException(
+                                "Goal not found with id: " + id
+                        )
+                );
+
+        // Make sure the goal belongs to the current user
+        if (!goal.getUser().getId().equals(user.getId())) {
+            throw new ResourceNotFoundException(
+                    "Goal not found with id: " + id
+            );
+        }
+
+        return goalMapper.toResponseDto(goal);
+    }
+
+    @Override
+    @Transactional
+    public GoalResponse updateGoal(Long id, String email, GoalRequest request) {
+        log.info("Updating goal: {} by user: {}", id, email);
+
+        com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
+        validateGoalRequest(request);
+
+        if (request.getTitle() != null) {
+            entity.setTitle(request.getTitle().trim());
+        }
+        if (request.getDescription() != null) {
+            entity.setDescription(request.getDescription().trim());
+        }
+        if (request.getFrequency() != null) {
+            entity.setFrequency(request.getFrequency());
+        }
+        if (request.getTargetDays() > 0) {
+            entity.setTargetDays(request.getTargetDays());
+            if (entity.getStartDate() != null) {
+                entity.setTargetDate(entity.getStartDate().plusDays(request.getTargetDays()));
+            }
+        }
+        if (request.getUnit() != null) {
+            entity.setUnit(request.getUnit());
+        }
+        if (request.getStartDate() != null) {
+            entity.setStartDate(request.getStartDate());
+            entity.setTargetDate(request.getStartDate().plusDays(entity.getTargetDays()));
+        }
+        if (request.getIcon() != null) {
+            entity.setIcon(request.getIcon());
+        }
+        if (request.getSilentMode() != null) {
+            entity.setSilentMode(request.getSilentMode());
+        }
+
+        com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
+        log.info("Goal updated successfully with id: {}", saved.getId());
+
+        return goalMapper.toResponseDto(saved);
+    }
+
 
     // ===== SCHEDULED JOB =====
     @Override
@@ -551,35 +628,7 @@ public class UserGoalServiceImpl implements UserGoalService {
                 .sum();
     }
 
-    private void updateStreak(User user) {
-        UserStreak streak = streakRepository.findByUser(user)
-                .orElseGet(() -> createNewStreak(user));
 
-        LocalDate today = LocalDate.now();
 
-        if (streak.getLastCompleted() != null && streak.getLastCompleted().equals(today)) {
-            log.debug("Streak already updated for user: {}", user.getEmail());
-            return;
-        }
 
-        if (streak.getLastCompleted() != null &&
-                streak.getLastCompleted().equals(today.minusDays(1))) {
-            streak.setStreakCount(streak.getStreakCount() + 1);
-            log.debug("Streak incremented for user: {}, new count: {}",
-                    user.getEmail(), streak.getStreakCount());
-        } else {
-            streak.setStreakCount(1);
-            log.debug("New streak started for user: {}", user.getEmail());
-        }
-
-        streak.setLastCompleted(today);
-        streakRepository.save(streak);
-    }
-
-    private UserStreak createNewStreak(User user) {
-        UserStreak streak = new UserStreak();
-        streak.setUser(user);
-        streak.setStreakCount(0);
-        return streakRepository.save(streak);
-    }
 }

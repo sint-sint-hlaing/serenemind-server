@@ -30,4 +30,6 @@ public interface GoalProgressRepository extends JpaRepository<GoalProgress, Long
     Optional<GoalProgress> findByGoalIdAndDate(@Param("goalId") Long goalId, @Param("date") LocalDate date);
 
     void deleteByGoalId(Long goalId);
+
+    List<GoalProgress> findByGoalIdAndDateBetween(Long goalId, LocalDate startDate, LocalDate endDate);
 }

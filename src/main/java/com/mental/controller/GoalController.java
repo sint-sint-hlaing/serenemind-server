@@ -38,6 +38,16 @@ public class GoalController {
                 .body(goalService.createGoal(principal.getEmail(), request));
     }
 
+    @Operation(summary = "Update goal details (title, description, notes, targetDays)")
+    @PatchMapping("/{id}")
+    public ResponseEntity<GoalResponse> updateGoal(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody GoalRequest request) {
+        log.info("Updating goal {} by user {}", id, principal.getEmail());
+        return ResponseEntity.ok(goalService.updateGoal(id, principal.getEmail(), request));
+    }
+
     // ===== GET ALL GOALS =====
     @Operation(summary = "Get all goals for current user")
     @GetMapping
@@ -45,6 +55,15 @@ public class GoalController {
             @AuthenticationPrincipal UserPrincipal principal) {
         log.debug("Fetching all goals for user: {}", principal.getEmail());
         return ResponseEntity.ok(goalService.getUserGoals(principal.getEmail()));
+    }
+    // Add this method to your GoalController.java
+    @Operation(summary = "Get goal details by ID including history and notes")
+    @GetMapping("/{id}")
+    public ResponseEntity<GoalResponse> getGoalById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        log.debug("Fetching goal details for id: {} by user: {}", id, principal.getEmail());
+        return ResponseEntity.ok(goalService.getGoalById(id, principal.getEmail()));
     }
 
     // ===== GET ACTIVE GOALS =====
@@ -96,7 +115,7 @@ public class GoalController {
 
     // ===== COMPLETE GOAL =====
     @Operation(summary = "Complete a goal")
-    @PatchMapping("/{id}/complete")
+    @PutMapping("/{id}/complete")
     public ResponseEntity<GoalResponse> completeGoal(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -106,7 +125,7 @@ public class GoalController {
 
     // ===== PAUSE GOAL =====
     @Operation(summary = "Pause a goal")
-    @PatchMapping("/{id}/pause")
+    @PutMapping("/{id}/pause")
     public ResponseEntity<GoalResponse> pauseGoal(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal) {
@@ -210,8 +229,6 @@ public class GoalController {
         response.setTotalGoals((int) stats.getTotal());
         response.setActiveGoals((int) stats.getActive());
         response.setCompletedGoals((int) stats.getCompleted());
-        response.setTotalStreak(stats.getTotalStreak());
-        response.setCurrentStreak(stats.getCurrentStreak());
 
         return ResponseEntity.ok(response);
     }
