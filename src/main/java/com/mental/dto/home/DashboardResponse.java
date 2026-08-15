@@ -1,32 +1,14 @@
 package com.mental.dto.home;
 
-import com.mental.dto.mood.WeeklyMoodResponse;
+import com.mental.model.entity.enums.MoodType;
 import lombok.Builder;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @Builder
 public record DashboardResponse(
-
-        String username,
-
-        String greeting,
-
-        LocalDate date,
-
-        TodayMoodResponse todayMood,
-
-        List<WeeklyMoodResponse> weeklyOverview,
-
-        List<QuickActionResponse> quickActions,
-
-        Integer currentStreak,
-
-        Boolean isNewBest,
-
-        long unreadNotificationCount
-
-) {
-
-}
+        String greeting,          // e.g., "Good morning, Aye!"
+        String formattedDate,     // e.g., "May 12, 2024"
+        TodayMoodDto todayMood,
+        List<WeeklyDayDto> weeklyOverview
+) {}
