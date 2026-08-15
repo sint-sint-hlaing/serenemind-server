@@ -103,15 +103,15 @@ public class GoalController {
         return ResponseEntity.ok(goalService.getGoalStatistics(principal.getEmail()));
     }
 
-    // ===== UPDATE PROGRESS =====
-    @Operation(summary = "Update goal progress (increment by 1)")
-    @PatchMapping("/{id}/progress")
-    public ResponseEntity<GoalResponse> updateProgress(
-            @PathVariable Long id,
-            @AuthenticationPrincipal UserPrincipal principal) {
-        log.info("Updating progress for goal: {} by user: {}", id, principal.getEmail());
-        return ResponseEntity.ok(goalService.updateProgress(id, principal.getEmail()));
-    }
+//    // ===== UPDATE PROGRESS =====
+//    @Operation(summary = "Update goal progress (increment by 1)")
+//    @PatchMapping("/{id}/progress")
+//    public ResponseEntity<GoalResponse> updateProgress(
+//            @PathVariable Long id,
+//            @AuthenticationPrincipal UserPrincipal principal) {
+//        log.info("Updating progress for goal: {} by user: {}", id, principal.getEmail());
+//        return ResponseEntity.ok(goalService.updateProgress(id, principal.getEmail()));
+//    }
 
     // ===== COMPLETE GOAL =====
     @Operation(summary = "Complete a goal")
@@ -231,5 +231,16 @@ public class GoalController {
         response.setCompletedGoals((int) stats.getCompleted());
 
         return ResponseEntity.ok(response);
+    }
+
+    // ===== UPDATE PROGRESS =====
+    @Operation(summary = "Update goal progress with completion status and optional note")
+    @PatchMapping("/{id}/progress")
+    public ResponseEntity<GoalResponse> updateProgress(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserPrincipal principal,
+            @Valid @RequestBody ProgressUpdateRequest request) {
+        log.info("Updating progress for goal: {} by user: {}", id, principal.getEmail());
+        return ResponseEntity.ok(goalService.updateProgress(id, principal.getEmail(), request));
     }
 }

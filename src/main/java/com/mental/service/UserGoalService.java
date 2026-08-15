@@ -46,4 +46,6 @@ public interface UserGoalService {
     GoalResponse getGoalById(Long id, String email);
 
     GoalResponse updateGoal(Long id, String email, @Valid GoalRequest request);
+
+    GoalResponse updateProgress(Long id, String email, ProgressUpdateRequest request);
 }

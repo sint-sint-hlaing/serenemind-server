@@ -7,6 +7,7 @@ import com.mental.model.entity.GoalNote;
 import com.mental.model.entity.GoalProgress;
 import com.mental.repository.GoalNoteRepository;
 import com.mental.repository.GoalProgressRepository;
+import com.mental.repository.UserGoalRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +23,7 @@ public class UserGoalMapper {
 
     private final GoalProgressRepository progressRepository;
     private final GoalNoteRepository noteRepository;
+    private final UserGoalRepository goalRepository;
 
     public GoalResponse toResponseDto(
             com.mental.model.entity.UserGoal entity) {
@@ -109,6 +111,15 @@ public class UserGoalMapper {
 
         dto.setNotes(notes);
 
+        // Progress တွက်ချက်ခြင်း
+        Integer completedCount = progressRepository.countCompletedByGoalId(entity.getId());
+        int totalDays = entity.getTargetDays() > 0 ? entity.getTargetDays() : 1;
+
+        // ရာခိုင်နှုန်း (Percentage) နဲ့ ပြချင်ရင် -
+        int progressPercentage = (completedCount != null) ? (completedCount * 100) / totalDays : 0;
+
+        dto.setProgress(progressPercentage); // သို့မဟုတ် completedCount ကိုပဲ တိုက်ရိုက်ပြချင်ရင် completedCount လို့ ထည့်နိုင်ပါတယ်
+
         return dto;
     }
 
@@ -117,14 +128,21 @@ public class UserGoalMapper {
     // =============================================================
 
     private List<ProgressHistoryDTO> buildWeeklyHistory(Long goalId) {
-        LocalDate endDate = LocalDate.now();
-        LocalDate startDate = endDate.minusDays(6); // ယနေ့အပါအဝင် လွန်ခဲ့သော 7 ရက်
+        // Fetch goal details to use its exact startDate and targetDate
+        com.mental.model.entity.UserGoal goal = goalRepository.findById(goalId).orElse(null);
 
-        // ဤ Goal အတွက် ပြီးမြောက်ထားသော နေ့စွဲများကို Repository မှ ယူခြင်း
+        LocalDate startDate = (goal != null && goal.getStartDate() != null)
+                ? goal.getStartDate()
+                : LocalDate.now();
+
+        LocalDate endDate = (goal != null && goal.getTargetDate() != null)
+                ? goal.getTargetDate()
+                : startDate.plusDays(9); // fallback to span target days
+
+        // Fetch completed dates and progress records for this date range
         List<LocalDate> completedDates = progressRepository.findCompletedDatesByGoalId(goalId);
-
-        // နေ့ရက်အလိုက် note များပါ ထည့်လိုပါက GoalProgress entity များကိုပါ တွဲယူနိုင်ပါသည်
         List<GoalProgress> progressList = progressRepository.findByGoalIdAndDateBetween(goalId, startDate, endDate);
+
         java.util.Map<LocalDate, GoalProgress> progressMap = progressList.stream()
                 .collect(Collectors.toMap(GoalProgress::getDate, p -> p));
 

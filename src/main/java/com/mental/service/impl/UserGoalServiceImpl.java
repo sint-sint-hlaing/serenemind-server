@@ -86,23 +86,14 @@ public class UserGoalServiceImpl implements UserGoalService {
         return goalMapper.toResponseDto(saved);
     }
 
-
     private void initializeProgress(com.mental.model.entity.UserGoal goal) {
-
-        LocalDate startDate = goal.getStartDate() != null
-                ? goal.getStartDate()
-                : LocalDate.now();
-
-        LocalDate targetDate = goal.getTargetDate() != null
-                ? goal.getTargetDate()
-                : startDate.plusDays(goal.getTargetDays());
+        LocalDate startDate = goal.getStartDate() != null ? goal.getStartDate() : LocalDate.now();
+        LocalDate targetDate = goal.getTargetDate() != null ? goal.getTargetDate() : startDate.plusDays(goal.getTargetDays() - 1);
 
         List<GoalProgress> progressList = new ArrayList<>();
-
         LocalDate date = startDate;
 
-        while (date.isBefore(targetDate)) {
-
+        while (!date.isAfter(targetDate)) {
             GoalProgress progress = GoalProgress.builder()
                     .goal(goal)
                     .date(date)
@@ -111,7 +102,6 @@ public class UserGoalServiceImpl implements UserGoalService {
                     .build();
 
             progressList.add(progress);
-
             date = date.plusDays(1);
         }
 
@@ -628,6 +618,63 @@ public class UserGoalServiceImpl implements UserGoalService {
                 .sum();
     }
 
+
+    // ===== UPDATE PROGRESS WITH UI PAYLOAD =====
+    @Override
+    public GoalResponse updateProgress(Long id, String email, ProgressUpdateRequest request) {
+        log.info("Updating progress for goal: {} by user: {}", id, email);
+
+        com.mental.model.entity.UserGoal entity = getGoalAndValidateOwnership(id, email);
+        validateGoalStatusForUpdate(entity);
+
+        // Update today's progress entry based on user selection (Completed/Skipped)
+        updateTodayProgressWithDetails(entity, request.isCompleted());
+
+        // Adjust overall goal progress counter if completed today
+        if (request.isCompleted()) {
+            if (canUpdateProgress(entity)) {
+                incrementProgress(entity);
+            }
+        }
+
+        // Add optional note if provided and not empty
+        if (request.getNote() != null && !request.getNote().trim().isEmpty()) {
+            GoalNote note = GoalNote.builder()
+                    .goal(entity)
+                    .content(request.getNote().trim())
+                    .build();
+            noteRepository.save(note);
+        }
+
+        // Check if goal is completed
+        if (entity.getProgress() >= entity.getTargetDays()) {
+            completeGoalInternal(entity);
+        }
+
+        com.mental.model.entity.UserGoal saved = goalRepository.save(entity);
+        log.info("Progress updated for goal: {}, new progress: {}/{}",
+                id, entity.getProgress(), entity.getTargetDays());
+
+        return goalMapper.toResponseDto(saved);
+    }
+
+    private void updateTodayProgressWithDetails(com.mental.model.entity.UserGoal entity, boolean isCompleted) {
+        LocalDate today = LocalDate.now();
+        GoalProgress progress = progressRepository.findByGoalIdAndDate(entity.getId(), today)
+                .orElseGet(() -> {
+                    GoalProgress newProgress = GoalProgress.builder()
+                            .goal(entity)
+                            .date(today)
+                            .completed(false)
+                            .value(0.0)
+                            .build();
+                    return progressRepository.save(newProgress);
+                });
+
+        progress.setCompleted(isCompleted);
+        progress.setValue(isCompleted ? 1.0 : 0.0);
+        progressRepository.save(progress);
+    }
 
 
 
