@@ -18,6 +18,4 @@ public class GoalStatistics {
     private long cancelled;
     private long totalProgress;
     private double completionRate;
-    private int totalStreak;  // Added
-    private int currentStreak; // Added
 }

@@ -9,7 +9,5 @@ public class HomeResponse {
     private Integer totalGoals;
     private Integer activeGoals;
     private Integer completedGoals;
-    private Integer totalStreak;
-    private Integer currentStreak;
 
 }

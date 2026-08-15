@@ -26,6 +26,7 @@ public class UserGoal {
     private Boolean silentMode;
     private Integer progress;
     private Integer streak;
+    private String note;
     private String status;
     private LocalDate completedAt;
     private LocalDateTime createdAt;
