@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.core.io.Resource;
 
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -64,21 +65,16 @@ public class MeditationController {
         return ResponseEntity.ok(meditationService.getHistory(principal.getEmail()));
     }
 
-    @GetMapping("/{id}/download")
-    public ResponseEntity<Resource> downloadAudio(
+
+    @GetMapping("/{id}/download-url")
+    public ResponseEntity<Map<String, String>> getDownloadUrl(
             @PathVariable Long id) {
 
-        Resource resource = meditationService.downloadAudio(id);
+        String url = meditationService.getAudioUrl(id);
 
-        return ResponseEntity.ok()
-                .header(
-                        HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename=\"" +
-                                resource.getFilename() +
-                                "\""
-                )
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .body(resource);
+        return ResponseEntity.ok(
+                Map.of("downloadUrl", url)
+        );
     }
     @PostMapping("/{id}/favorite")
     public ResponseEntity<FavoriteResponse> toggleFavorite(
@@ -185,16 +181,7 @@ public class MeditationController {
         return ResponseEntity.ok(
                 meditationService.getNext(id));
     }
-    @GetMapping("/{id}/stream")
-    public ResponseEntity<Resource> stream(
-            @PathVariable Long id) {
 
-        Resource resource = (Resource) meditationService.streamAudio(id);
-
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType("audio/mpeg"))
-                .body(resource);
-    }
 
 
 }

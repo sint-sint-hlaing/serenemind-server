@@ -38,6 +38,12 @@ public class MeditationSession extends BaseEntity {
 
     private Integer durationMinutes;
 
+    @Column(name = "started_at")
+    private LocalDateTime startedAt;
+
+    // When timer should finish
+    @Column(name = "ends_at")
+    private LocalDateTime endsAt;
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 

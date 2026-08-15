@@ -346,29 +346,57 @@ public class MeditationService {
 
     // ===== SAVE TIMER =====
     @Transactional
-    public TimerResponse saveTimer(Long userId, Long meditationId, TimerRequest request) {
-        log.info("Saving timer for user: {}, meditation: {}, minutes: {}", userId, meditationId, request.getMinutes());
+    public TimerResponse saveTimer(
+            Long userId,
+            Long meditationId,
+            TimerRequest request) {
+
+        log.info(
+                "Saving timer: user={}, meditation={}, minutes={}",
+                userId,
+                meditationId,
+                request.getMinutes()
+        );
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("User not found"));
 
         Meditation meditation = meditationRepository.findById(meditationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Meditation not found"));
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Meditation not found"));
 
-        MeditationSession session = sessionRepository
-                .findByUserAndMeditationId(user, meditationId)
-                .orElse(MeditationSession.builder()
-                        .user(user)
-                        .meditation(meditation)
-                        .build());
+        LocalDateTime now = LocalDateTime.now();
+
+        LocalDateTime endsAt =
+                now.plusMinutes(request.getMinutes());
+
+        MeditationSession session =
+                sessionRepository
+                        .findByUserAndMeditationId(user, meditationId)
+                        .orElse(
+                                MeditationSession.builder()
+                                        .user(user)
+                                        .meditation(meditation)
+                                        .build()
+                        );
 
         session.setDurationMinutes(request.getMinutes());
+        session.setStartedAt(now);
+        session.setEndsAt(endsAt);
+
         session.setCompleted(false);
         session.setProgressPercentage(0);
         session.setCompletedAt(null);
+
         sessionRepository.save(session);
 
-        return new TimerResponse(request.getMinutes(), "Timer set for " + request.getMinutes() + " minutes");
+        return new TimerResponse(
+                request.getMinutes(),
+                "Timer set for "
+                        + request.getMinutes()
+                        + " minutes"
+        );
     }
 
     // ===== GET SHARE LINK =====
@@ -411,11 +439,10 @@ public class MeditationService {
         return meditationMapper.toListResponse(meditation);
     }
 
-    // ===== STREAM AUDIO =====
-    @Transactional(readOnly = true)
-    public Resource streamAudio(Long id) {
 
-        log.debug("Streaming audio for meditation: {}", id);
+    // ===== DOWNLOAD AUDIO =====
+    @Transactional(readOnly = true)
+    public Resource downloadAudio(Long id) {
 
         Meditation meditation = meditationRepository.findById(id)
                 .orElseThrow(() ->
@@ -429,37 +456,8 @@ public class MeditationService {
 
         try {
             return new UrlResource(audioUrl);
-
         } catch (MalformedURLException e) {
-            log.error("Invalid audio URL for meditation {}: {}", id, audioUrl, e);
             throw new RuntimeException("Invalid audio URL", e);
-        }
-    }
-
-    // ===== DOWNLOAD AUDIO =====
-    @Transactional(readOnly = true)
-    public Resource downloadAudio(Long id) {
-        log.debug("Downloading audio for meditation: {}", id);
-
-        Meditation meditation = meditationRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Meditation not found"));
-
-        try {
-            String audioUrl = meditation.getAudioUrl();
-            if (audioUrl == null || audioUrl.isBlank()) {
-                throw new RuntimeException("Audio URL is empty");
-            }
-
-            Resource resource = new UrlResource(audioUrl);
-
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new RuntimeException("Audio file not found");
-            }
-
-            return resource;
-        } catch (MalformedURLException e) {
-            log.error("Invalid audio URL for meditation {}: {}", id, e.getMessage());
-            throw new RuntimeException("Invalid audio URL: " + meditation.getAudioUrl(), e);
         }
     }
 
@@ -496,5 +494,26 @@ public class MeditationService {
         // Calculate percentage based on time
         int percentage = (completedMinutes * 100) / totalMinutes;
         return Math.min(100, percentage);
+    }
+
+
+    @Transactional(readOnly = true)
+    public String getAudioUrl(Long id) {
+
+        log.debug("Getting audio URL for meditation: {}", id);
+
+        Meditation meditation = meditationRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Meditation not found with id: " + id));
+
+        String audioUrl = meditation.getAudioUrl();
+
+        if (audioUrl == null || audioUrl.isBlank()) {
+            throw new ResourceNotFoundException(
+                    "Audio URL not found for meditation: " + id
+            );
+        }
+
+        return audioUrl;
     }
 }
