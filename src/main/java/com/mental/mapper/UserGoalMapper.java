@@ -110,15 +110,20 @@ public class UserGoalMapper {
                         .collect(Collectors.toList());
 
         dto.setNotes(notes);
-
-        // Progress တွက်ချက်ခြင်း
+        // Progress တွက်ချက်ခြင်း (DB ထဲမှာ completed ဖြစ်နေတဲ့ ရက်အရေအတွက်ကို တိုက်ရိုက်ရေတွက်သုံးခြင်း)
         Integer completedCount = progressRepository.countCompletedByGoalId(entity.getId());
-        int totalDays = entity.getTargetDays() > 0 ? entity.getTargetDays() : 1;
+        int currentProgress = (completedCount != null) ? completedCount : 0;
 
-        // ရာခိုင်နှုန်း (Percentage) နဲ့ ပြချင်ရင် -
-        int progressPercentage = (completedCount != null) ? (completedCount * 100) / totalDays : 0;
+        dto.setProgress(currentProgress);
 
-        dto.setProgress(progressPercentage); // သို့မဟုတ် completedCount ကိုပဲ တိုက်ရိုက်ပြချင်ရင် completedCount လို့ ထည့်နိုင်ပါတယ်
+//        // Progress တွက်ချက်ခြင်း
+//        Integer completedCount = progressRepository.countCompletedByGoalId(entity.getId());
+//        int totalDays = entity.getTargetDays() > 0 ? entity.getTargetDays() : 1;
+//
+//        // ရာခိုင်နှုန်း (Percentage) နဲ့ ပြချင်ရင် -
+//        int progressPercentage = (completedCount != null) ? (completedCount * 100) / totalDays : 0;
+//
+//        dto.setProgress(progressPercentage); // သို့မဟုတ် completedCount ကိုပဲ တိုက်ရိုက်ပြချင်ရင် completedCount လို့ ထည့်နိုင်ပါတယ်
 
         return dto;
     }
