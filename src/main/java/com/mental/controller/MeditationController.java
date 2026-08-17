@@ -11,13 +11,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.core.io.Resource;
 
 import java.util.List;
 import java.util.Map;
@@ -47,6 +45,20 @@ public class MeditationController {
         return ResponseEntity.ok(meditationService.getById(id,userId));
     }
 
+    @Operation(summary = "Get all meditations or filter by category")
+    @GetMapping
+    public ResponseEntity<List<MeditationResponse>> getAll(
+            @RequestParam(required = false) MeditationCategory category) {
+
+        if (category != null) {
+            log.debug("Fetching meditations by category: {}", category);
+            return ResponseEntity.ok(meditationService.getByCategory(category));
+        }
+
+        log.debug("Fetching all meditations");
+        return ResponseEntity.ok(meditationService.getAll(category));
+    }
+
     @Operation(summary = "Complete a meditation session")
     @PostMapping("/complete")
     public ResponseEntity<Void> completeSession(
@@ -65,6 +77,13 @@ public class MeditationController {
         return ResponseEntity.ok(meditationService.getHistory(principal.getEmail()));
     }
 
+    @Operation(summary = "Get meditation statistics")
+    @GetMapping("/statistics")
+    public ResponseEntity<MeditationStatistics> getStatistics() {
+        return ResponseEntity.ok(
+                meditationService.getStatistics()
+        );
+    }
 
     @GetMapping("/{id}/download-url")
     public ResponseEntity<Map<String, String>> getDownloadUrl(
@@ -98,6 +117,15 @@ public class MeditationController {
         );
     }
 
+    @Operation(summary = "Get meditation audio URL")
+    @GetMapping("/{id}/audio")
+    public ResponseEntity<String> getAudioUrl(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(
+                meditationService.getAudioUrl(id)
+        );
+    }
 
     @Operation(summary = "Get meditations by time")
     @GetMapping("/time/{time}")
