@@ -17,7 +17,7 @@ public record MeditationRequest(
 
         @NotNull(message = "Category is required")
         String category,
-        @Min(value = 1, message = "Duration must be at least 1 minute")
+//        @Min(value = 1, message = "Duration must be at least 1 minute")
         String duration,
         @NotNull(message = "Difficulty is required")
         Integer difficulty,

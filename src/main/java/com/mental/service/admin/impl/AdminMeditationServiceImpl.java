@@ -1,5 +1,6 @@
 package com.mental.service.admin.impl;
 
+import com.mental.dto.AudioUploadResult;
 import com.mental.dto.admin.MeditationAdminDto;
 import com.mental.dto.analysis.MeditationTrendDto;
 import com.mental.dto.meditation.MeditationRequest;
@@ -65,11 +66,15 @@ public class AdminMeditationServiceImpl implements AdminMeditationService {
                 request.audioFile().getOriginalFilename(),
                 request.audioFile().getSize());
 
-        // ✅ Upload audio
+        // ✅ Upload audio & Get actual duration from Cloudinary
         String audioUrl = null;
+        int durationInSeconds = 0;
+
         try {
-            audioUrl = cloudinaryService.storeFile(request.audioFile(), "audios");
-            log.info("Audio uploaded successfully: {}", audioUrl);
+            AudioUploadResult audioResult = cloudinaryService.storeAudioFile(request.audioFile(), "audios");
+            audioUrl = audioResult.url();
+            durationInSeconds = audioResult.durationSeconds();
+            log.info("Audio uploaded successfully: {}, duration: {}s", audioUrl, durationInSeconds);
         } catch (Exception e) {
             log.error("Failed to upload audio: {}", e.getMessage(), e);
             throw new RuntimeException("Audio upload failed: " + e.getMessage());
@@ -83,7 +88,6 @@ public class AdminMeditationServiceImpl implements AdminMeditationService {
                 log.info("Image uploaded successfully: {}", imageUrl);
             } catch (Exception e) {
                 log.warn("Image upload failed: {}", e.getMessage());
-                // Image is optional, continue without it
             }
         }
 
@@ -100,13 +104,15 @@ public class AdminMeditationServiceImpl implements AdminMeditationService {
         }
 
         meditation.setDifficulty(request.difficulty());
-        meditation.setDuration(request.duration());
 
-        Integer durationInMinutes = Integer.parseInt(request.duration());
-        Integer durationInSeconds = durationInMinutes * 60;
-        meditation.setDurationSeconds(durationInSeconds);
+        // ✅ MP3 ဖိုင်၏ အချိန်အမှန်အပေါ် မူတည်၍ Duration (Minutes) ကို Auto တွက်ပေးခြင်း
+        // အနည်းဆုံး 1 မိနစ် သို့မဟုတ် Duration (စက္ကန့် / ၆၀)
+        int calculatedMinutes = Math.max(1, (int) Math.round(durationInSeconds / 60.0));
 
-        meditation.setAudioUrl(audioUrl);  // ✅ Now not null
+        meditation.setDuration(String.valueOf(calculatedMinutes)); // "10"
+        meditation.setDurationSeconds(durationInSeconds);          // 600
+
+        meditation.setAudioUrl(audioUrl);
         meditation.setImageUrl(imageUrl);
         meditation.setStatus(MeditationStatus.PUBLISHED);
 
@@ -130,7 +136,7 @@ public class AdminMeditationServiceImpl implements AdminMeditationService {
                 .duration(Integer.valueOf(saved.getDuration()))
                 .audioUrl(saved.getAudioUrl())
                 .imageUrl(saved.getImageUrl())
-                .active(false)  // DRAFT status ဖြစ်လို့ false
+                .active(false)
                 .totalSessions(0L)
                 .createdAt(saved.getCreatedAtAsInstant())
                 .timeOfDay(saved.getTimeOfDay().name())
