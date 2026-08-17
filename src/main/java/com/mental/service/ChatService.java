@@ -3,6 +3,7 @@ package com.mental.service;
 import com.mental.dto.chat.ChatRequest;
 import com.mental.dto.chat.ConversationResponse;
 import com.mental.dto.chat.MessageResponse;
+import com.mental.exception.ResourceNotFoundException;
 import com.mental.model.entity.Conversation;
 import com.mental.model.entity.Message;
 import com.mental.repository.ConversationRepository;
@@ -10,6 +11,7 @@ import com.mental.repository.MessageRepository;
 import com.mental.security.UserPrincipal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,12 +31,6 @@ public class ChatService {
 
     /**
      * SereneAI system instructions.
-     *
-     * Important:
-     * - SereneAI is a supportive mental-health companion.
-     * - It is NOT a doctor, therapist, or emergency service.
-     * - It must not diagnose or prescribe medication.
-     * - It must respond safely to crisis/self-harm situations.
      */
     private static final String SYSTEM_PROMPT = """
             You are SereneAI, a compassionate, warm, respectful, and non-judgmental
@@ -305,7 +301,7 @@ public class ChatService {
             conversation = conversationRepository
                     .findById(request.getConversationId())
                     .orElseThrow(() ->
-                            new RuntimeException("Conversation not found")
+                            new ResourceNotFoundException("Conversation not found with id: " + request.getConversationId())
                     );
 
             // ---------------------------------------------
@@ -313,7 +309,7 @@ public class ChatService {
             // ---------------------------------------------
 
             if (!Objects.equals(conversation.getUserId(), userId)) {
-                throw new RuntimeException(
+                throw new AccessDeniedException(
                         "Unauthorized access to conversation"
                 );
             }
@@ -380,11 +376,8 @@ public class ChatService {
 
         } catch (Exception e) {
 
-            // Log the actual error in your logger
-            // log.error("AI response generation failed", e);
-
-            throw new RuntimeException(
-                    "Unable to generate AI response",
+            throw new IllegalArgumentException(
+                    "Unable to generate AI response: " + e.getMessage(),
                     e
             );
         }
@@ -483,8 +476,8 @@ public class ChatService {
         Conversation conversation =
                 conversationRepository.findById(conversationId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Conversation not found"
+                                new ResourceNotFoundException(
+                                        "Conversation not found with id: " + conversationId
                                 )
                         );
 
@@ -522,8 +515,8 @@ public class ChatService {
         Conversation conversation =
                 conversationRepository.findById(conversationId)
                         .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Conversation not found"
+                                new ResourceNotFoundException(
+                                        "Conversation not found with id: " + conversationId
                                 )
                         );
 
@@ -618,7 +611,7 @@ public class ChatService {
                 userId
         )) {
 
-            throw new RuntimeException(
+            throw new AccessDeniedException(
                     "Unauthorized access to conversation"
             );
         }

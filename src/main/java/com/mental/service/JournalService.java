@@ -401,7 +401,7 @@ public class JournalService {
                         || secureUrl.isBlank()
         ) {
 
-            throw new RuntimeException(
+            throw new IllegalArgumentException(
                     "Photo upload failed. Please try again."
             );
         }
