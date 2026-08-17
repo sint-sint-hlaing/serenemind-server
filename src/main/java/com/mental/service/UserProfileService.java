@@ -75,7 +75,12 @@ public class UserProfileService {
             userRepository.save(user);
         }
 
-        UserProfile profile = getUserProfile(email);
+        UserProfile profile = userProfileRepository.findByUserEmail(email)
+                .orElseGet(() -> {
+                    UserProfile newProfile = new UserProfile();
+                    newProfile.setUser(user); // User Object နှင့် ချိတ်ဆက်ပေးပါ
+                    return userProfileRepository.save(newProfile);
+                });
 
         if (request.getFullname() != null && !request.getFullname().isBlank()) {
             profile.setFullname(request.getFullname());

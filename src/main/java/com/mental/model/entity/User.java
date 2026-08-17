@@ -28,7 +28,7 @@ public class User extends BaseEntity {
     private String email;
 
     @Column(nullable = false)
-    private String bio;
+    private String bio = "Be kind to your mind";
 
     @Column(nullable = false)
     private String location;
