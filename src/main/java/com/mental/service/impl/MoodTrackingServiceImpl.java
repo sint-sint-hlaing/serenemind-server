@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.*;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -153,43 +154,37 @@ public class MoodTrackingServiceImpl implements MoodTrackingService {
         log.debug("Fetching weekly mood for user: {}", email);
 
         LocalDate today = LocalDate.now();
-        LocalDate weekAgo = today.minusDays(7);
+        LocalDate startOfWeek = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        LocalDate endOfWeek = startOfWeek.plusDays(6); // SUNDAY
 
         List<MoodEntry> entries = moodTrackingRepository
-                .findByUserEmailAndDateBetweenOrderByDateAsc(email, weekAgo, today);
+                .findByUserEmailAndDateBetweenOrderByDateAsc(email, startOfWeek, endOfWeek);
 
-        if (entries.isEmpty()) {
-            return createEmptyWeeklyMood(weekAgo, today);
-        }
+        // Date တစ်ခုစီ၏ နောက်ဆုံး Entry ကို Map ထဲသို့ စုစည်းခြင်း
+        Map<LocalDate, MoodEntry> entryMap = entries.stream()
+                .collect(Collectors.toMap(
+                        MoodEntry::getDate,
+                        e -> e,
+                        (existing, replacement) -> existing.getCreatedAt().isAfter(replacement.getCreatedAt()) ? existing : replacement
+                ));
 
         List<WeeklyMoodResponse> responses = new ArrayList<>();
 
-        for (DayOfWeek day : DayOfWeek.values()) {
-            // ထိုနေ့အတွက် မှတ်တမ်းရှိမရှိ စစ်ဆေးခြင်း
-            Optional<MoodEntry> entryForDay = entries.stream()
-                    .filter(entry -> entry.getDate().getDayOfWeek() == day)
-                    .reduce((first, second) -> {
-                        // တစ်နေ့တည်းတွင် မှတ်တမ်းများစွာရှိပါက နောက်ဆုံးတစ်ခုကို ယူပါ
-                        return first.getCreatedAt().isAfter(second.getCreatedAt()) ? first : second;
-                    });
+        // startOfWeek (ရှေ့ ၇ ရက်) မှ today အထိ စစ်ဆေးမည်
+        for (LocalDate date = startOfWeek; !date.isAfter(today); date = date.plusDays(1)) {
+            DayOfWeek day = date.getDayOfWeek();
+            MoodEntry entry = entryMap.get(date);
 
-            if (entryForDay.isPresent()) {
-                // ✅ မှတ်တမ်းရှိသောနေ့
-                MoodEntry entry = entryForDay.get();
+            if (entry != null) {
                 responses.add(WeeklyMoodResponse.createDailyEntry(
                         day,
                         entry.getMood(),
-                        entry.getScore(),        // ✅ သိမ်းဆည်းထားသော Score ကို သုံးပါ
+                        entry.getScore(),
                         entry.getIntensity(),
                         entry.getNote()
                 ));
-
-                log.debug("Day: {}, Mood: {}, Score: {}, Intensity: {}",
-                        day, entry.getMood(), entry.getScore(), entry.getIntensity());
             } else {
-                // ✅ မှတ်တမ်းမရှိသောနေ့
                 responses.add(WeeklyMoodResponse.createEmptyDailyEntry(day));
-                log.debug("Day: {}, No entry found", day);
             }
         }
 
