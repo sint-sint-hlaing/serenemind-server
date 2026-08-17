@@ -70,4 +70,6 @@ public interface MeditationSessionRepository
 
     @Query("SELECT ms FROM MeditationSession ms WHERE ms.user = :user AND ms.completed = false")
     List<MeditationSession> findIncompleteSessionsByUser(User user);
+
+    long countByUserAndCompletedTrue(User user);
 }

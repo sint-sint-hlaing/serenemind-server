@@ -41,6 +41,8 @@ public class UserProfileService {
     private final PostRepository postRepository;
     private final CloudinaryService cloudinaryService;
     private final UserRepository userRepository;
+    private final MeditationSessionRepository meditationSessionRepository;
+    private final FavoriteRepository  favoriteRepository;
     private final UserMapper userMapper;
 
     @Transactional(readOnly = true)
@@ -51,11 +53,14 @@ public class UserProfileService {
         long journalCount = journalRepository.countByUserId(user.getId());
         long completedGoalsCount = userGoalRepository.countByUserIdAndStatus(user.getId(), GoalStatus.COMPLETED);
         long postCount = postRepository.countByUserId(user.getId());
-
+        long completedMeditations = meditationSessionRepository.countByUserAndCompletedTrue(user);
+        long favorites = favoriteRepository.countByUserId(user.getId());
         return UserActivityResponse.builder()
                 .totalJournals(journalCount)
                 .goalsCompleted(completedGoalsCount)
                 .totalPosts(postCount)
+                .completedMeditationsCount(completedMeditations)
+                .favoriteMeditationsCount(favorites)
                 .build();
     }
 
