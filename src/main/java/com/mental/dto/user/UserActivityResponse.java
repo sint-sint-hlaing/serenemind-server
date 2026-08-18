@@ -15,4 +15,6 @@ public class UserActivityResponse {
     private long totalJournals;
     private long goalsCompleted;
     private long totalPosts;
+    private long completedMeditationsCount;
+    private long favoriteMeditationsCount;
 }

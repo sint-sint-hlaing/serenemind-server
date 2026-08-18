@@ -401,7 +401,7 @@ public class JournalService {
                         || secureUrl.isBlank()
         ) {
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "Photo upload failed. Please try again."
             );
         }
@@ -562,7 +562,7 @@ public class JournalService {
 
         } catch (Exception e) {
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "Unable to decrypt journal content for analysis.",
                     e
             );
@@ -837,7 +837,7 @@ public class JournalService {
                             || aiContent.isBlank()
             ) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "Groq returned an empty AI response."
                 );
             }
@@ -854,18 +854,6 @@ public class JournalService {
 
             // ----------------------------------------------------
             // Clean markdown fences
-            //
-            // Handles:
-            //
-            // ```json
-            // {...}
-            // ```
-            //
-            // and:
-            //
-            // ```
-            // {...}
-            // ```
             // ----------------------------------------------------
 
             String cleanedJson =
@@ -894,7 +882,7 @@ public class JournalService {
                         cleanedJson
                 );
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "Groq returned invalid JSON.",
                         jsonException
                 );
@@ -905,7 +893,7 @@ public class JournalService {
                             || !resultNode.isObject()
             ) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "Groq returned an invalid analysis object."
                 );
             }
@@ -931,7 +919,7 @@ public class JournalService {
 
             if (emotion.isBlank()) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI returned an empty emotion."
                 );
             }
@@ -954,7 +942,7 @@ public class JournalService {
                             && !sentiment.equals("NEUTRAL")
             ) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI returned invalid sentiment: "
                                 + sentiment
                 );
@@ -972,7 +960,7 @@ public class JournalService {
                             || stressNode.isFloatingPointNumber()
             ) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI returned an invalid stressScore."
                 );
             }
@@ -985,7 +973,7 @@ public class JournalService {
                             || stressScore > MAX_STRESS_SCORE
             ) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI returned invalid stressScore: "
                                 + stressScore
                 );
@@ -1002,7 +990,7 @@ public class JournalService {
 
             if (themes.isEmpty()) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI returned no key themes."
                 );
             }
@@ -1020,7 +1008,7 @@ public class JournalService {
 
             if (aiResponse.isBlank()) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI returned an empty aiResponse."
                 );
             }
@@ -1038,7 +1026,7 @@ public class JournalService {
 
             if (aiSuggestion.isBlank()) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI returned an empty aiSuggestion."
                 );
             }
@@ -1108,7 +1096,7 @@ public class JournalService {
                     saved
             );
 
-        } catch (RuntimeException e) {
+        } catch (IllegalStateException e) {
 
             System.err.println(
                     "========================================"
@@ -1130,7 +1118,7 @@ public class JournalService {
                     "========================================"
             );
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "AI analysis failed. Please try again later.",
                     e
             );
@@ -1142,7 +1130,7 @@ public class JournalService {
                             + e.getMessage()
             );
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "AI analysis failed. Please try again later.",
                     e
             );
@@ -1164,9 +1152,6 @@ public class JournalService {
         String cleaned =
                 response.trim();
 
-        /*
-         * Remove ```json ... ```
-         */
         if (cleaned.startsWith("```")) {
 
             int firstNewLine =
@@ -1196,14 +1181,6 @@ public class JournalService {
         cleaned =
                 cleaned.trim();
 
-        /*
-         * Sometimes models return:
-         *
-         * Here is the JSON:
-         * {...}
-         *
-         * Find the first object and last object.
-         */
         int firstBrace =
                 cleaned.indexOf('{');
 
@@ -1249,7 +1226,7 @@ public class JournalService {
                             || node.get(field).isNull()
             ) {
 
-                throw new RuntimeException(
+                throw new IllegalStateException(
                         "AI response is missing required field: "
                                 + field
                 );
@@ -1258,35 +1235,35 @@ public class JournalService {
 
         if (!node.get("emotion").isTextual()) {
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "AI field 'emotion' must be a string."
             );
         }
 
         if (!node.get("sentiment").isTextual()) {
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "AI field 'sentiment' must be a string."
             );
         }
 
         if (!node.get("keyThemes").isArray()) {
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "AI field 'keyThemes' must be an array."
             );
         }
 
         if (!node.get("aiResponse").isTextual()) {
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "AI field 'aiResponse' must be a string."
             );
         }
 
         if (!node.get("aiSuggestion").isTextual()) {
 
-            throw new RuntimeException(
+            throw new IllegalStateException(
                     "AI field 'aiSuggestion' must be a string."
             );
         }

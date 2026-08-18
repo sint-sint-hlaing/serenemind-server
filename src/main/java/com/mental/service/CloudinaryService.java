@@ -2,6 +2,7 @@ package com.mental.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import com.mental.dto.AudioUploadResult;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -107,6 +108,27 @@ public class CloudinaryService {
         } catch (Exception e) {
 
             throw new RuntimeException("Cloudinary သို့ ဖိုင်တင်ခြင်း မအောင်မြင်ပါ: " + e.getMessage(), e);
+        }
+    }
+
+
+    public AudioUploadResult storeAudioFile(MultipartFile file, String folder) {
+        try {
+            Map uploadResult = cloudinary.uploader().upload(
+                    file.getBytes(),
+                    ObjectUtils.asMap(
+                            "resource_type", "video", // Audio ဖိုင်များအတွက် "video" သုံးရပါမည်
+                            "folder", folder
+                    )
+            );
+
+            String url = uploadResult.get("secure_url").toString();
+            Double durationDouble = (Double) uploadResult.get("duration");
+            int durationSeconds = durationDouble != null ? durationDouble.intValue() : 0;
+
+            return new AudioUploadResult(url, durationSeconds);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to upload audio to Cloudinary", e);
         }
     }
 }

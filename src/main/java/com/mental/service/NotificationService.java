@@ -32,13 +32,18 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public List<NotificationResponse> getNotifications(UserPrincipal userPrincipal, String filter) {
+        if (userPrincipal == null) {
+            throw new UsernameNotFoundException("Authenticated user not found");
+        }
+
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         List<Notification> notifications;
 
+        String selectedFilter = (filter != null) ? filter.toLowerCase() : "all";
 
-        switch (filter.toLowerCase()) {
+        switch (selectedFilter) {
             case "unread":
                 notifications = notificationRepository.findByUserAndIsReadFalseOrderByCreatedAtDesc(currentUser);
                 break;
@@ -61,11 +66,18 @@ public class NotificationService {
 
     @Transactional
     public void markAsRead(Long id, UserPrincipal userPrincipal) {
+        if (id == null) {
+            throw new IllegalArgumentException("Notification ID cannot be null");
+        }
+        if (userPrincipal == null) {
+            throw new UsernameNotFoundException("Authenticated user not found");
+        }
+
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         Notification notification = notificationRepository.findByIdAndUser(id, currentUser)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + id));
 
         notification.setRead(true);
         notificationRepository.save(notification);
@@ -74,6 +86,10 @@ public class NotificationService {
 
     @Transactional
     public void markAllAsRead(UserPrincipal userPrincipal) {
+        if (userPrincipal == null) {
+            throw new UsernameNotFoundException("Authenticated user not found");
+        }
+
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
@@ -86,6 +102,10 @@ public class NotificationService {
 
     @Transactional
     public void createNotification(User recipient, String title, String message, String type, Long targetId, String targetType) {
+        if (recipient == null) {
+            throw new IllegalArgumentException("Notification recipient user cannot be null");
+        }
+
         Notification noti = new Notification();
         noti.setUser(recipient);
         noti.setTitle(title);
@@ -102,11 +122,18 @@ public class NotificationService {
 
     @Transactional
     public NotificationResponse clickAndGetNotification(Long id, UserPrincipal userPrincipal) {
+        if (id == null) {
+            throw new IllegalArgumentException("Notification ID cannot be null");
+        }
+        if (userPrincipal == null) {
+            throw new UsernameNotFoundException("Authenticated user not found");
+        }
+
         User currentUser = userRepository.findByEmail(userPrincipal.getEmail())
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         Notification notification = notificationRepository.findByIdAndUser(id, currentUser)
-                .orElseThrow(() -> new ResourceNotFoundException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + id));
 
 
         if (!notification.isRead()) {
@@ -135,12 +162,21 @@ public class NotificationService {
     }
 
     public long getUnreadCount(Long id) {
+        if (id == null) {
+            throw new IllegalArgumentException("User ID cannot be null");
+        }
         return notificationRepository.countByUserIdAndIsReadFalse(id);
     }
 
     public Page<NotificationResponse> getUnreadNotifications(UserPrincipal user, int page, int size) {
+        if (user == null) {
+            throw new UsernameNotFoundException("Authenticated user not found");
+        }
+        if (page < 0 || size <= 0) {
+            throw new IllegalArgumentException("Page index must not be less than zero and size must be greater than zero");
+        }
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-        Page<Notification> notificationPage= notificationRepository.findByUserIdAndIsReadFalse(user.getId(),pageable);
+        Page<Notification> notificationPage = notificationRepository.findByUserIdAndIsReadFalse(user.getId(), pageable);
         return notificationPage.map(this::convertToNotificationResponse);
     }
 }

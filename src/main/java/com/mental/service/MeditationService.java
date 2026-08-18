@@ -77,10 +77,14 @@ public class MeditationService {
 
     // ===== GET ALL MEDITATIONS =====
     @Transactional(readOnly = true)
-    public List<MeditationResponse> getAll() {
-        log.debug("Fetching all meditations");
-        return meditationRepository.findAll()
-                .stream()
+    public List<MeditationResponse> getAll(MeditationCategory category) {
+        List<Meditation> meditations = (category != null)
+                ? meditationRepository.findByCategory(category)
+                : meditationRepository.findAll();
+
+        log.debug(category != null ? "Fetching meditations by category: {}" : "Fetching all meditations", category);
+
+        return meditations.stream()
                 .map(meditationMapper::toResponse)
                 .collect(Collectors.toList());
     }
@@ -516,4 +520,6 @@ public class MeditationService {
 
         return audioUrl;
     }
+
+
 }
